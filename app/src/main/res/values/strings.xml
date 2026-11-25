@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Z3X Finance Agent</string>
+    <string name="admin_description">Device management policies for devices enrolled by their owner.</string>
+</resources>
