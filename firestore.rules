@@ -1,0 +1,142 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return signedIn() ? request.auth.token.role : null;
+    }
+
+    function isSuperAdmin() {
+      return role() == "super_admin";
+    }
+
+    function isStaff() {
+      return role() in ["super_admin", "admin", "assistant"];
+    }
+
+    function ownsDevice(deviceId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/devices/$(deviceId))
+        && get(/databases/$(database)/documents/devices/$(deviceId)).data.ownerUid == request.auth.uid;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isStaff());
+      // Role claims are assigned only by a trusted Admin SDK process.
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(["displayName", "email", "createdAt", "updatedAt"])
+        && request.resource.data.email == request.auth.token.email;
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(["displayName", "updatedAt"]);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /devices/{deviceId} {
+      allow read: if isStaff() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      // Device identity, enrollment credentials and check-ins are server-managed.
+      allow create, update, delete: if false;
+    }
+
+    match /device_policies/{deviceId} {
+      allow read: if isStaff() || ownsDevice(deviceId);
+      allow create, update: if isStaff()
+        && request.resource.data.keys().hasOnly([
+          "deviceId", "version", "updatedAt", "updatedBy",
+          "noFactoryReset", "noDebuggingFeatures", "noSafeBoot",
+          "disableCamera", "noInstallUnknownSources", "noModifyAccounts",
+          "noUsbFileTransfer", "noConfigTethering", "noUninstallApps",
+          "kioskMode", "lockMessage", "requireStorageEncryption",
+          "passwordQuality", "passwordMinLength", "passwordExpiryDays",
+          "screenLockTimeoutSeconds", "appVisible"
+        ]);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /enrollment_codes/{codeId} {
+      // Codes are redeemed and managed only by trusted server endpoints.
+      allow read, write: if false;
+    }
+
+    match /device_commands/{commandId} {
+      allow read: if isStaff();
+      // Only non-destructive, user-visible commands may be queued by console clients.
+      allow create: if isStaff()
+        && request.resource.data.keys().hasOnly([
+          "deviceId", "command", "payload", "status", "createdAt", "createdBy"
+        ])
+        && request.resource.data.command in [
+          "request_check_in", "refresh_policy", "display_notice"
+        ]
+        && request.resource.data.status == "pending"
+        && request.resource.data.deviceId is string
+        && request.resource.data.createdBy == request.auth.uid;
+      // Delivery, results and completion timestamps are server-managed.
+      allow update, delete: if false;
+    }
+
+    match /device_installments/{installmentId} {
+      allow read: if isStaff()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if isStaff()
+        && request.resource.data.deviceId is string
+        && request.resource.data.ownerUid is string
+        && request.resource.data.amountMinor is int
+        && request.resource.data.amountMinor > 0
+        && request.resource.data.currencyCode is string;
+      allow update: if isStaff()
+        && request.resource.data.deviceId == resource.data.deviceId
+        && request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if isSuperAdmin();
+    }
+
+    match /device_installment_payments/{paymentId} {
+      allow read: if isStaff()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if isStaff()
+        && request.resource.data.installmentId is string
+        && request.resource.data.ownerUid is string
+        && request.resource.data.amountMinor is int
+        && request.resource.data.amountMinor > 0
+        && request.resource.data.currencyCode is string;
+      allow update, delete: if false;
+    }
+
+    match /device_finance_actions/{actionId} {
+      allow read: if isStaff()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      // These are review records only; they do not trigger device controls.
+      allow create: if isStaff()
+        && request.resource.data.keys().hasOnly([
+          "deviceId", "ownerUid", "installmentId", "type",
+          "decision", "reason", "recordedBy", "createdAt"
+        ])
+        && request.resource.data.type == "payment_review"
+        && request.resource.data.decision in ["approved", "declined"]
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 3
+        && request.resource.data.reason.size() <= 500
+        && request.resource.data.recordedBy == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isStaff();
+      // Audit entries are appended by trusted server code only.
+      allow create, update, delete: if false;
+    }
+
+    match /device_locations/{locationId} {
+      allow read: if isStaff()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      // Location data is written only by an authenticated, permission-aware device API.
+      allow create, update, delete: if false;
+    }
+  }
+}

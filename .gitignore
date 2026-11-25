@@ -1,0 +1,19 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.keystore
+*.jks
+serviceAccount*.json
+firebase-adminsdk*.json
+google-services.*.json
+!app/google-services.json
+
+# Build outputs and local tooling
+.gradle/
+**/build/
+local.properties
+node_modules/
+dist/
