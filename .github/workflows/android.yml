@@ -28,8 +28,11 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # GitHub-hosted Ubuntu runners already include the Android SDK.
+      # Accept SDK licences non-interactively to avoid the setup-android
+      # action's interactive licence prompt in CI.
+      - name: Accept Android SDK licences
+        run: yes | sdkmanager --licenses
 
       - name: Install Android SDK packages
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
