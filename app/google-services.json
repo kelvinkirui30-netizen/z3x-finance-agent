@@ -1,0 +1,28 @@
+{
+  "project_info": {
+    "project_number": "526874875358",
+    "project_id": "device-owner-manager",
+    "storage_bucket": "device-owner-manager.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:526874875358:android:c5e3eda80e8045eb4ef94f",
+        "android_client_info": {
+          "package_name": "com.dom.manager"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "AIzaSyDsddm3bH4Z9MV2vFFGjpU34klhz7EitEA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
