@@ -27,14 +27,14 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 ## Delivery phases and acceptance criteria
 
 ### Phase 0 — Repository and environment audit
-**Status: In progress**
+**Status: Repository review completed; build verification pending**
 
 - Inspect Android app, web portal, API routes, Firebase schema/rules, build workflows and Vercel settings assumptions.
 - Identify incomplete, duplicated or unsafe code and establish a clean build baseline.
-- Confirm the current Android workflow and add a separate web build check.
+- Confirm the Android build workflow and harden the existing separate Vite web build workflow.
 - Document deployment steps and secrets required without exposing secret values.
 
-**Exit criteria:** reproducible Android and web builds; documented current state; no credentials committed.
+**Audit findings:** Android has a starter Firebase email/password flow and basic local device status only. The portal has a partial role-aware scaffold and a Firebase Admin SDK account endpoint. Enrollment, check-in, health recovery, tamper reporting, signed commands and complete finance workflows are not implemented. Firestore rules are draft-only and have not been deployed. Separate Android and web CI workflows are present; the web workflow now has read-only repository permissions and Node 22. No build result is claimed from this source inspection.\n\n**Exit criteria:** reproducible Android and web builds; documented current state; no credentials committed.
 
 ### Phase 1 — Identity, roles and backend security
 - Complete server-side authentication middleware for every privileged API.
@@ -143,7 +143,7 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 | Staff management API | Partial endpoint exists | Harden, paginate and test Phase 1 |
 | Finance records | Rules/schema proposal exists; no complete workflows | Phase 8 |
 | Firestore rules | Draft exists in repository | Test and deploy only after review |
-| CI | Android workflow exists | Verify it and add web/rules checks |
+| CI | Android and separate Vite web build workflows exist; web workflow hardened | Verify both workflow results and add rules/API tests |
 | Vercel | Project deployed by owner | Verify latest deployment and server functions |
 
 ## Working method
