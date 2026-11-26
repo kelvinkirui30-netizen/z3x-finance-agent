@@ -41,5 +41,7 @@ jobs:
           node-version: "22"
       - name: Install test dependencies
         run: npm install --no-audit --no-fund
-      - name: Test Firestore rules in emulator
+      - name: Install web API dependencies
+        run: npm install --prefix web --no-audit --no-fund
+      - name: Test API validation, syntax and Firestore rules
         run: npm test
