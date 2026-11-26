@@ -21,7 +21,7 @@ async function authorize(req, auth) {
   const match = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i);
   if (!match) throw Object.assign(new Error("Sign in is required."), { status: 401 });
   const decoded = await auth.verifyIdToken(match[1], true);
-  if (decoded.role !== "super_admin") throw Object.assign(new Error("Super Admin access is required."), { status: 403 });
+  if (!["super_admin", "admin", "assistant"].includes(decoded.role)) throw Object.assign(new Error("Staff access is required."), { status: 403 });
   return decoded;
 }
 export default async function handler(req, res) {
@@ -43,6 +43,7 @@ export default async function handler(req, res) {
         }))
       });
     }
+    if (actor.role !== "super_admin") return send(res, 403, { error: "Only Super Admin can change account roles or status." });
     const { uid, role, disabled } = req.body || {};
     if (typeof uid !== "string" || !uid.trim()) return send(res, 400, { error: "A valid account UID is required." });
     if (uid === actor.uid) return send(res, 400, { error: "You cannot change your own account role or status here." });
