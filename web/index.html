@@ -37,6 +37,8 @@
         <button class="nav" data-view="applications"><span>▤</span> Applications</button>
         <button class="nav" data-view="compliance"><span>✓</span> Compliance</button>
         <div class="nav-label second">ADMINISTRATION</div>
+        <button class="nav" data-view="users"><span>♙</span> User management</button>
+        <button class="nav" data-view="staff" id="staff-nav"><span>♧</span> Staff management</button>
         <button class="nav" data-view="activity"><span>◷</span> Activity log</button>
         <div class="sidebar-bottom"><div class="status-dot"></div><div><b>Firebase connected</b><small>Authorized admin workspace</small></div></div>
       </aside>
@@ -74,6 +76,20 @@
         <section id="view-policies" class="view hidden"><div class="section-head"><div><h3>Policy centre</h3><p>Review policy records. No policy changes are issued from this portal yet.</p></div></div><div class="panel"><div id="policy-rows" class="empty large">Loading policy records…</div></div></section>
         <section id="view-applications" class="view hidden"><div class="section-head"><div><h3>Application management</h3><p>Application inventory is not connected yet.</p></div></div><div class="panel"><div class="empty large">The Android agent must report permitted app inventory before this section can show live data.</div></div></section>
         <section id="view-compliance" class="view hidden"><div class="section-head"><div><h3>Compliance centre</h3><p>Recorded device enrollment and compliance status.</p></div></div><div class="panel"><div class="table-wrap"><table><thead><tr><th>DEVICE</th><th>ENROLLMENT</th><th>COMPLIANCE</th><th>LAST SEEN</th></tr></thead><tbody id="compliance-rows"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody></table></div></div></section>
+        <section id="view-users" class="view hidden">
+          <div class="section-head"><div><h3>User management</h3><p>View Firebase accounts and their access status.</p></div><button class="btn secondary" id="refresh-users">↻ Refresh users</button></div>
+          <div class="panel"><div class="table-wrap"><table><thead><tr><th>ACCOUNT</th><th>ROLE</th><th>STATUS</th><th>EMAIL VERIFIED</th><th>LAST SIGN-IN</th></tr></thead><tbody id="user-rows"><tr><td colspan="5" class="empty">Load accounts to view users.</td></tr></tbody></table></div></div>
+        </section>
+        <section id="view-staff" class="view hidden">
+          <div class="section-head"><div><h3>Staff management</h3><p>Only Super Admin can promote or demote Admin and Assistant accounts.</p></div><button class="btn secondary" id="refresh-staff">↻ Refresh staff</button></div>
+          <div class="panel staff-panel">
+            <h3>Change account access</h3>
+            <p class="muted">Enter the account's Firebase Authentication UID. Super Admin cannot be assigned from this screen.</p>
+            <div class="staff-form"><label>Firebase account UID<input id="staff-uid" autocomplete="off" placeholder="Paste the target account UID"></label><label>New role<select id="staff-role"><option value="user">Normal User</option><option value="assistant">Assistant</option><option value="admin">Admin</option></select></label><button class="btn primary" id="save-staff-role">Save role</button></div>
+            <p id="staff-message" class="auth-message" role="status"></p>
+          </div>
+          <div class="panel"><div class="panel-head"><div><h3>Current staff</h3><p>Staff accounts returned by Firebase Authentication.</p></div></div><div class="table-wrap"><table><thead><tr><th>STAFF ACCOUNT</th><th>ROLE</th><th>STATUS</th><th>LAST SIGN-IN</th></tr></thead><tbody id="staff-rows"><tr><td colspan="4" class="empty">Load staff accounts.</td></tr></tbody></table></div></div>
+        </section>
         <section id="view-activity" class="view hidden"><div class="section-head"><div><h3>Activity log</h3><p>Traceable administrative events.</p></div></div><div class="panel"><div id="activity-full" class="empty">Loading activity…</div></div></section>
         <footer>© 2026 Z3X Finance Agent <span>Authorized device administration only</span></footer>
       </main>
