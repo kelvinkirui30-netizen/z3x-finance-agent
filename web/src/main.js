@@ -227,13 +227,19 @@ async function loadAccounts({ append = false } = {}) {
     accountPageToken = result.nextPageToken || null;
     const users = accountRows;
     const staff = users.filter((u) => ["super_admin", "admin", "assistant"].includes(u.role));
-    usersEl.innerHTML = users.length ? users.map((u) => '<tr><td><b>' + escapeHtml(u.displayName || "Unnamed account") + '</b><span class="subline">' + escapeHtml(u.email) + '</span><span class="subline">' + escapeHtml(u.uid) + '</span></td><td>' + pill(u.role) + '</td><td>' + (u.disabled ? "Disabled" : "Enabled") + '</td><td>' + (u.emailVerified ? "Verified" : "Not verified") + '</td><td>' + date(u.lastSignInAt) + '</td></tr>').join("") : '<tr><td colspan="5" class="empty">No accounts found.</td></tr>';
+    usersEl.innerHTML = users.length ? users.map((u) => {
+      const canToggle = currentRole === "super_admin" && u.uid !== signedInUser.uid && u.role !== "super_admin" && u.email !== "shadowvybez001@gmail.com";
+      const action = canToggle
+        ? '<button class="btn secondary" type="button" data-account-toggle data-uid="' + escapeHtml(u.uid) + '" data-disabled="' + String(Boolean(u.disabled)) + '">' + (u.disabled ? "Enable" : "Disable") + '</button>'
+        : "—";
+      return '<tr><td><b>' + escapeHtml(u.displayName || "Unnamed account") + '</b><span class="subline">' + escapeHtml(u.email) + '</span><span class="subline">' + escapeHtml(u.uid) + '</span></td><td>' + pill(u.role) + '</td><td>' + (u.disabled ? "Disabled" : "Enabled") + '</td><td>' + (u.emailVerified ? "Verified" : "Not verified") + '</td><td>' + date(u.lastSignInAt) + '</td><td>' + action + '</td></tr>';
+    }).join("") : '<tr><td colspan="6" class="empty">No accounts found.</td></tr>';
     staffEl.innerHTML = staff.length ? staff.map((u) => '<tr><td><b>' + escapeHtml(u.displayName || u.email) + '</b><span class="subline">' + escapeHtml(u.email) + '</span></td><td>' + pill(u.role) + '</td><td>' + (u.disabled ? "Disabled" : "Enabled") + '</td><td>' + date(u.lastSignInAt) + '</td></tr>').join("") : '<tr><td colspan="4" class="empty">No staff accounts assigned yet.</td></tr>';
     const more = $("#load-more-accounts");
     if (more) more.classList.toggle("hidden", !accountPageToken);
   } catch (error) {
     if (!append) {
-      usersEl.innerHTML = '<tr><td colspan="5" class="empty">' + escapeHtml(error.message) + '</td></tr>';
+      usersEl.innerHTML = '<tr><td colspan="6" class="empty">' + escapeHtml(error.message) + '</td></tr>';
       staffEl.innerHTML = '<tr><td colspan="4" class="empty">' + escapeHtml(error.message) + '</td></tr>';
     } else showToast(error.message);
   }
@@ -241,6 +247,24 @@ async function loadAccounts({ append = false } = {}) {
 
 
 function wireAdminTools() {
+  const usersTable = $("#user-rows");
+  usersTable?.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-account-toggle]");
+    if (!button || currentRole !== "super_admin") return;
+    const uid = button.dataset.uid;
+    const currentlyDisabled = button.dataset.disabled === "true";
+    const nextDisabled = !currentlyDisabled;
+    if (!uid || !window.confirm((nextDisabled ? "Disable" : "Enable") + " this account?")) return;
+    button.disabled = true;
+    try {
+      const result = await staffApi("POST", { uid, disabled: nextDisabled });
+      showToast(result.message || "Account status updated.");
+      await loadAccounts();
+    } catch (error) {
+      showToast(error.message);
+      button.disabled = false;
+    }
+  });
   $("#refresh-users")?.addEventListener("click", loadAccounts);
   $("#refresh-staff")?.addEventListener("click", () => loadAccounts());
   $("#load-more-accounts")?.addEventListener("click", () => loadAccounts({ append: true }));
