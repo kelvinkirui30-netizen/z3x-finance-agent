@@ -71,7 +71,9 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 
 ### Phase 3 — Device identity, inventory and capability discovery
 **Status: Initial identity fields are now reported during enrollment; ongoing check-in and expanded capability discovery pending**
-- [x] Enrollment reports manufacturer, model, Android release/API, app version, app-generated installation ID and actual management mode.
+- [x] Enrollment reports manufacturer, model, Android release/API, app version, app-generated installation ID and actual management mode (including Device Admin).
+- [x] Capture battery percentage and charging state through Android's BatteryManager when available.
+- [x] Show the enrolled device's reported model, Android version, management mode, battery and last-seen time in the personal portal.
 - Collect manufacturer, model, Android release/API, app version, app-generated installation ID, device display name where available, battery/charging state where permitted, and last check-in.
 - Report access mode: Standard, Device Admin (legacy), Profile Owner, or Device Owner; do not conflate these.
 - Build a capability matrix from Android version, provisioning state, permissions and actual API checks.
@@ -148,7 +150,7 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 | Area | Current repository evidence | Remaining work |
 |---|---|---|
 | Android authentication | Email/password Firebase Auth screen exists | Confirm account policy, errors and profile rules |
-| Device status | Manufacturer/model/Android/API and owner-mode check exists | Expand safe inventory and capability discovery |
+| Device status | Manufacturer/model/Android/API, Device Owner/Profile Owner/Device Admin/Standard Access, battery/charging reported on enrollment | Add ongoing check-in, capability matrix and battery refresh |
 | Device enrollment | One-time code generation, authenticated same-account binding, on-device confirmation and atomic consume/create flow implemented | Add endpoint tests, revoke/unenroll and real-device verification |
 | Device check-in | Not implemented end-to-end | Phases 2–4 |
 | Self-healing | Not implemented | Phase 4 |
