@@ -9,7 +9,7 @@ service cloud.firestore {
     // A missing role is treated as a normal user. Only trusted Admin SDK
     // code may assign custom claims; clients cannot promote themselves.
     function role() {
-      return signedIn() ? request.auth.token.role : null;
+      return signedIn() ? request.auth.token.get("role", "user") : null;
     }
 
     function isSuperAdmin() {
