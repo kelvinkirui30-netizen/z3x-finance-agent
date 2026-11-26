@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-import { getFirestore, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { getFirestore, collection, getDocs, query, orderBy, limit, where } from "firebase/firestore";
 import "./styles.css";
 
 const env = import.meta.env;
@@ -81,29 +81,38 @@ if (missing.length) {
     }
     try {
       const token = await user.getIdTokenResult(true);
-      const role = token.claims.role;
-      if (!["super_admin", "admin", "assistant"].includes(role)) {
+      const role = token.claims.role || "user";
+      if (role !== "super_admin" && role !== "admin" && role !== "assistant" && role !== "user") {
+        throw new Error("This account has an unrecognized access role.");
+      }
+      if (role === "user" && user.email === "shadowvybez001@gmail.com") {
         portal.classList.add("hidden");
         authScreen.classList.remove("hidden");
-        if (user.email === "shadowvybez001@gmail.com") {
-          $("#bootstrap-panel").classList.remove("hidden");
-          authMessage.textContent = "Owner account verified. Complete the one-time activation below.";
-        } else {
-          $("#bootstrap-panel").classList.add("hidden");
-          await signOut(auth);
-          authMessage.textContent = "This account does not have an approved staff role.";
-        }
+        $("#bootstrap-panel").classList.remove("hidden");
+        authMessage.textContent = "Owner account verified. Complete the one-time activation below.";
         return;
       }
-      currentRole = role || "user";
+      currentRole = role;
       $("#staff-nav").classList.toggle("hidden", currentRole !== "super_admin");
+      document.querySelectorAll(".nav[data-view='policies'], .nav[data-view='applications'], .nav[data-view='compliance'], .nav[data-view='activity']").forEach((el) => el.classList.toggle("hidden", currentRole === "user"));
+      document.querySelectorAll(".nav[data-view='devices']").forEach((el) => el.classList.toggle("hidden", currentRole === "user"));
+      document.querySelectorAll(".nav[data-view='overview']").forEach((el) => el.classList.toggle("hidden", currentRole === "user"));
+      document.querySelectorAll(".nav[data-view='users']").forEach((el) => el.classList.toggle("hidden", !["super_admin", "admin", "assistant"].includes(currentRole)));
       $("#bootstrap-panel").classList.add("hidden");
       authScreen.classList.add("hidden");
       portal.classList.remove("hidden");
       $("#avatar").textContent = (user.displayName || user.email || "A").slice(0, 1).toUpperCase();
-      await loadDashboard(db);
-      wireNavigation(db);
-      wireAdminTools();
+      if (currentRole === "user") {
+        document.querySelectorAll(".view").forEach((view) => view.classList.add("hidden"));
+        $("#view-user-home").classList.remove("hidden");
+        $("#page-title").textContent = "My account";
+        await loadPersonalDashboard(db, user);
+        $("#refresh-my-data").onclick = () => loadPersonalDashboard(db, user);
+      } else {
+        await loadDashboard(db);
+        wireNavigation(db);
+        wireAdminTools();
+      }
     } catch (error) {
       await signOut(auth);
       authMessage.textContent = friendlyError(error);
