@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     const { auth, db } = services();
     const match = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i);
     if (!match) return send(res, 401, { error: "Sign in to the same account that created this code." });
-    const user = await auth.verifyIdToken(match[1], true);
+    const user = await auth.verifyIdToken(match[1], !process.env.FIRESTORE_EMULATOR_HOST);
     const body = req.body || {};
     const code = String(body.code || "").trim().toUpperCase();
     if (!isValidEnrollmentCode(code)) return send(res, 400, { error: "Enter a valid 8-character enrollment code." });
