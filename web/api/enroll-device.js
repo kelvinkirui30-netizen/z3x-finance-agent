@@ -4,7 +4,9 @@ import { getAuth } from "firebase-admin/auth";
 import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { isValidInstallId, isValidEnrollmentCode, normalizeDevicePayload, isEnrollmentCodeUsable, isDeviceEnrolled } from "../lib/device-validation.js";
 
-const PROJECT_ID = "device-owner-manager";
+const PROJECT_ID = process.env.FIRESTORE_EMULATOR_HOST
+  ? (process.env.FIREBASE_PROJECT_ID || "device-owner-manager")
+  : "device-owner-manager";
 function send(res, status, body) {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("X-Content-Type-Options", "nosniff");
