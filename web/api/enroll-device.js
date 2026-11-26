@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
+import { isValidInstallId, isValidEnrollmentCode, normalizeDevicePayload, isEnrollmentCodeUsable } from "../lib/device-validation.js";
 
 const PROJECT_ID = "device-owner-manager";
 function send(res, status, body) {
