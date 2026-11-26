@@ -5,7 +5,8 @@ const endpoints = [
   ["create enrollment code", "../web/api/create-enrollment-code.js"],
   ["enroll device", "../web/api/enroll-device.js"],
   ["device check-in", "../web/api/device-checkin.js"],
-  ["unenroll device", "../web/api/unenroll-device.js"]
+  ["unenroll device", "../web/api/unenroll-device.js"],
+  ["revoke enrollment code", "../web/api/revoke-enrollment-code.js"]
 ];
 
 function mockResponse() {
