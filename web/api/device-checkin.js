@@ -38,17 +38,25 @@ export default async function handler(req, res) {
     if (!normalized.ok) return send(res, 400, { error: normalized.error });
     const { sdkInt, batteryLevel, isCharging, ...patch } = normalized.value;
     const ref = db.collection("devices").doc(installId);
-    const snap = await ref.get();
-    if (!snap.exists) return send(res, 404, { error: "This installation is not enrolled. Generate a new code in your portal." });
-    if (!isDeviceOwnedBy(snap.data(), user.uid)) return send(res, 403, { error: "This device is not linked to the signed-in account." });
-    if (!isDeviceEnrolled(snap.data())) return send(res, 410, { error: "This device is no longer enrolled. Link it again from your portal if you want to resume check-ins." });
-    await ref.update({
-      ...patch,
-      sdkInt,
-      batteryLevel,
-      isCharging,
-      lastSeenAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp()
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) {
+        throw Object.assign(new Error("This installation is not enrolled. Generate a new code in your portal."), { status: 404 });
+      }
+      if (!isDeviceOwnedBy(snap.data(), user.uid)) {
+        throw Object.assign(new Error("This device is not linked to the signed-in account."), { status: 403 });
+      }
+      if (!isDeviceEnrolled(snap.data())) {
+        throw Object.assign(new Error("This device is no longer enrolled. Link it again from your portal if you want to resume check-ins."), { status: 410 });
+      }
+      tx.update(ref, {
+        ...patch,
+        sdkInt,
+        batteryLevel,
+        isCharging,
+        lastSeenAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      });
     });
     return send(res, 200, { success: true, checkedInAt: new Date().toISOString() });
   } catch (error) {
