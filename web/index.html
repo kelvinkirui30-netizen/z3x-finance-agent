@@ -14,8 +14,21 @@
         <div class="brand-mark">Z</div>
         <p class="eyebrow">Z3X FINANCE AGENT</p>
         <h1>Management Portal</h1>
-        <p class="muted">Sign in with an authorized administrator account.</p>
-        <button class="btn primary full-width" id="google-signin">Continue with Google</button>
+        <p class="muted">Sign in or create an account with your email address, or continue with Google.</p>
+        <form id="email-auth-form" class="email-auth-form">
+          <label for="auth-email">Email address</label>
+          <input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com" />
+          <label for="auth-password">Password</label>
+          <input id="auth-password" type="password" autocomplete="current-password" minlength="8" required placeholder="At least 8 characters" />
+          <button class="btn primary full-width" id="email-submit" type="submit">Sign in with email</button>
+        </form>
+        <div class="auth-links">
+          <button class="text-btn" id="auth-mode-toggle" type="button">Create an account</button>
+          <button class="text-btn" id="forgot-password" type="button">Forgot password?</button>
+        </div>
+        <div class="auth-divider"><span>OR</span></div>
+        <button class="btn secondary full-width" id="google-signin">Continue with Google</button>
+        <button class="btn secondary full-width hidden" id="resend-verification" type="button">Resend verification email</button>
         <p class="auth-message" id="auth-message" role="status"></p>
         <div id="bootstrap-panel" class="hidden">
           <label for="bootstrap-secret">One-time Super Admin activation secret</label>
