@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification, reload } from "firebase/auth";
 import { getFirestore, collection, getDocs, query, orderBy, limit, where } from "firebase/firestore";
 import "./styles.css";
 
@@ -125,6 +125,25 @@ if (missing.length) {
     }
   });
 
+  $("#confirm-verification").addEventListener("click", async () => {
+    if (!signedInUser) return;
+    const button = $("#confirm-verification");
+    button.disabled = true;
+    try {
+      await reload(signedInUser);
+      if (!signedInUser.emailVerified) {
+        authMessage.textContent = "Email is not verified yet. Open the verification link in your inbox, then try again.";
+        return;
+      }
+      await signedInUser.getIdToken(true);
+      location.reload();
+    } catch (error) {
+      authMessage.textContent = friendlyError(error);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   $("#resend-verification").addEventListener("click", async () => {
     if (!signedInUser) return;
     try {
@@ -148,6 +167,7 @@ if (missing.length) {
       authScreen.classList.remove("hidden");
       $("#bootstrap-panel").classList.add("hidden");
       $("#resend-verification").classList.add("hidden");
+      $("#confirm-verification").classList.add("hidden");
       return;
     }
     try {
@@ -157,10 +177,12 @@ if (missing.length) {
         authScreen.classList.remove("hidden");
         $("#bootstrap-panel").classList.add("hidden");
         $("#resend-verification").classList.remove("hidden");
+        $("#confirm-verification").classList.remove("hidden");
         authMessage.textContent = "Please verify your email address before entering the portal. Check your inbox or request another verification email below.";
         return;
       }
       $("#resend-verification").classList.add("hidden");
+      $("#confirm-verification").classList.add("hidden");
       const token = await user.getIdTokenResult(true);
       const role = token.claims.role || "user";
       if (role !== "super_admin" && role !== "admin" && role !== "assistant" && role !== "user") {
