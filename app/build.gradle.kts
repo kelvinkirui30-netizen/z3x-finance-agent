@@ -40,6 +40,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
 
     implementation(platform("com.google.firebase:firebase-bom:34.5.0"))
     implementation("com.google.firebase:firebase-auth")
