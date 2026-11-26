@@ -36,8 +36,18 @@ The rules in `firestore.rules` implement the base separation:
 
 ## Implementation status
 
-The portal now includes role-aware navigation, a normal-user self-service view, staff/user account listings, and a trusted Firebase Admin SDK endpoint for account listing and Super Admin-only role changes. The endpoint writes role-change events through the Admin SDK to the audit log.
+The portal has role-aware navigation, a normal-user self-service view, account/staff tables, and a Firebase Admin SDK endpoint for staff account operations.
 
-The web build passed in GitHub Actions for commit 427fba99b5116048f9967d553ed4c8e0f3d87f65. Vercel deployment and live Firebase integration still need confirmation. Firestore rules remain a separate deployment: a GitHub commit does not publish them to Firebase. Test the rules in the Firebase Emulator or Rules Playground before deploying. The personal dashboard expects records to carry ownerUid matching the authenticated Firebase UID. Finance data remains display-only; no payments are initiated by the portal.
+Phase 1 hardening now includes:
+- Server-verified Firebase ID tokens and custom role claims on the account API.
+- Admin and Super Admin access to the paginated account directory; Assistants are denied access to the full directory.
+- Super Admin-only role/status changes, protected Super Admin accounts, self-change prevention, input validation and audit event writes.
+- Firestore rules restrict finance record reads to Admin/Super Admin and the record owner; profile display-name writes are constrained; policy document IDs must match their device IDs.
 
-Only the Super Admin can change staff roles. Normal users are restricted to queries for their own devices and finance records. Staff role changes are made server-side and require the caller's verified Super Admin custom claim.
+Important remaining work:
+- Automated Firebase Emulator tests for all four roles and cross-account access.
+- App Check/rate-limiting and complete API security review.
+- Review and test bootstrap recovery and audit failure handling.
+- Firestore rules have NOT been deployed to Firebase. Do not deploy production rules until tests pass and the project data model has been reviewed.
+- A GitHub commit does not prove a Vercel production deployment or successful CI build. Confirm the dedicated Web Portal workflow and Android APK workflow separately.
+- Finance data remains display-only; no payments are initiated by the portal.
