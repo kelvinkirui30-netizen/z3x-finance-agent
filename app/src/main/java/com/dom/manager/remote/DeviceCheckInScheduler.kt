@@ -11,6 +11,10 @@ import java.util.concurrent.TimeUnit
 object DeviceCheckInScheduler {
     private const val UNIQUE_WORK_NAME = "z3x-device-check-in"
 
+    fun cancel(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK_NAME)
+    }
+
     fun schedule(context: Context) {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
