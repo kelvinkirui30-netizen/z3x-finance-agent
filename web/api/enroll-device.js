@@ -25,7 +25,7 @@ export default async function handler(req, res) {
   }
   try {
     const { auth, db } = services();
-    const match = String(req.headers.authorization || "").match(/^Bearer\\s+(.+)$/i);
+    const match = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i);
     if (!match) return send(res, 401, { error: "Sign in to the same account that created this code." });
     const user = await auth.verifyIdToken(match[1], true);
     const body = req.body || {};
