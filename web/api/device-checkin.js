@@ -48,6 +48,7 @@ export default async function handler(req, res) {
     const snap = await ref.get();
     if (!snap.exists) return send(res, 404, { error: "This installation is not enrolled. Generate a new code in your portal." });
     if (snap.data().ownerUid !== user.uid) return send(res, 403, { error: "This device is not linked to the signed-in account." });
+    if (snap.data().enrollmentStatus !== "enrolled") return send(res, 410, { error: "This device is no longer enrolled. Link it again from your portal if you want to resume check-ins." });
     await ref.update({
       ...patch,
       sdkInt,
