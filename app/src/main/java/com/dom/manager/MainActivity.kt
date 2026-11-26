@@ -126,6 +126,10 @@ private fun DeviceDashboard(
     var devices by remember { mutableStateOf<List<ManagedDevice>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
+    var enrollmentCode by remember { mutableStateOf("") }
+    var enrollmentBusy by remember { mutableStateOf(false) }
+    var enrollmentMessage by remember { mutableStateOf<String?>(null) }
+    var confirmEnrollment by remember { mutableStateOf(false) }
 
     DisposableEffect(userId) {
         val registration = repository.observeMyDevices(
@@ -180,8 +184,64 @@ private fun DeviceDashboard(
                 } ?: Text("Reading local device status…")
             }
         }
+
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Link this device", style = MaterialTheme.typography.titleLarge)
+                Text("Generate a one-time code in your web portal, then enter it here. The device will be linked to the account currently signed in.")
+                OutlinedTextField(
+                    value = enrollmentCode,
+                    onValueChange = { enrollmentCode = it.uppercase().filter { c -> c.isLetterOrDigit() }.take(8); enrollmentMessage = null },
+                    label = { Text("8-character enrollment code") },
+                    singleLine = true,
+                    enabled = !enrollmentBusy,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Button(
+                    onClick = { confirmEnrollment = true },
+                    enabled = !enrollmentBusy && enrollmentCode.length == 8 && localStatus != null,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (enrollmentBusy) "Linking device…" else "Review and link device")
+                }
+                enrollmentMessage?.let { Text(it, color = if (it.startsWith("Device successfully")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error) }
+                Text("Only permitted device details are submitted: manufacturer, model, Android version, app version and actual management mode. IMEI and serial numbers are not collected.", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        if (confirmEnrollment) {
+            AlertDialog(
+                onDismissRequest = { confirmEnrollment = false },
+                title = { Text("Confirm device enrollment") },
+                text = {
+                    Text("Link this ${localStatus?.manufacturer.orEmpty()} ${localStatus?.model.orEmpty()} to the account $email? The code is single-use and expires after 10 minutes.")
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val snapshot = localStatus
+                        confirmEnrollment = false
+                        if (snapshot != null) {
+                            enrollmentBusy = true
+                            enrollmentMessage = null
+                            repository.enrollCurrentDevice(context, enrollmentCode, snapshot) { result ->
+                                enrollmentBusy = false
+                                result.onSuccess {
+                                    enrollmentCode = ""
+                                    enrollmentMessage = "Device successfully linked. Your device list will update automatically."
+                                }.onFailure {
+                                    enrollmentMessage = it.localizedMessage ?: "Device enrollment failed."
+                                }
+                            }
+                        }
+                    }) { Text("Confirm and link") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmEnrollment = false }) { Text("Cancel") }
+                }
+            )
+        }
+
         Text(
-            "Cloud device status will appear here after a trusted enrollment and check-in service is configured. Installing this app alone does not enroll a device.",
+            "After enrollment, the portal can show the device details reported by this agent. Installing this app alone does not enroll a device.",
             style = MaterialTheme.typography.bodySmall
         )
     }
