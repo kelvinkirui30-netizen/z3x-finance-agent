@@ -108,7 +108,7 @@ if (missing.length) {
         $("#page-title").textContent = "My account";
         await loadPersonalDashboard(db, user);
         $("#refresh-my-data").onclick = () => loadPersonalDashboard(db, user);
-        wireEnrollmentCode(user);
+        wireEnrollmentCode(user, db);
       } else {
         await loadDashboard(db);
         wireNavigation(db);
@@ -308,7 +308,7 @@ function wireNavigation(db) {
 }
 
 
-function wireEnrollmentCode(user) {
+function wireEnrollmentCode(user, db) {
   const button = $("#generate-enrollment-code");
   const output = $("#enrollment-code-result");
   const deviceList = $("#my-device-list");
