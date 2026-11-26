@@ -176,6 +176,8 @@ private fun DeviceDashboard(
                     InfoRow("Model", "${status.manufacturer} ${status.model}")
                     InfoRow("Android", status.androidVersion)
                     InfoRow("API level", status.sdkInt.toString())
+                    status.batteryLevel?.let { InfoRow("Battery", "$it%") }
+                    status.isCharging?.let { InfoRow("Charging", if (it) "Yes" else "No") }
                     InfoRow("Management", when {
                         status.isDeviceOwner -> "Device Owner"
                         status.isProfileOwner -> "Profile Owner"
