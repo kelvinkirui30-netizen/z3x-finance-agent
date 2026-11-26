@@ -35,11 +35,15 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(["displayName", "email", "createdAt", "updatedAt"])
-        && request.resource.data.email == request.auth.token.email;
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 100;
       allow update: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(["displayName", "updatedAt"]);
+          .hasOnly(["displayName", "updatedAt"])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 100;
       allow delete: if isSuperAdmin();
     }
 
@@ -52,6 +56,7 @@ service cloud.firestore {
     match /device_policies/{deviceId} {
       allow read: if isStaff() || ownsDevice(deviceId);
       allow create, update: if isAdmin()
+        && request.resource.data.deviceId == deviceId
         && request.resource.data.keys().hasOnly([
           "deviceId", "version", "updatedAt", "updatedBy",
           "noFactoryReset", "noDebuggingFeatures", "noSafeBoot",
@@ -85,7 +90,7 @@ service cloud.firestore {
     }
 
     match /device_installments/{installmentId} {
-      allow read: if isStaff()
+      allow read: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid);
       allow create: if isAdmin()
         && request.resource.data.deviceId is string
@@ -100,7 +105,7 @@ service cloud.firestore {
     }
 
     match /device_installment_payments/{paymentId} {
-      allow read: if isStaff()
+      allow read: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid);
       allow create: if isAdmin()
         && request.resource.data.installmentId is string
@@ -112,7 +117,7 @@ service cloud.firestore {
     }
 
     match /device_finance_actions/{actionId} {
-      allow read: if isStaff()
+      allow read: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid);
       allow create: if isAdmin()
         && request.resource.data.keys().hasOnly([
