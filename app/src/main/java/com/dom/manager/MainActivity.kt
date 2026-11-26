@@ -181,7 +181,8 @@ private fun DeviceDashboard(
                     InfoRow("Management", when {
                         status.isDeviceOwner -> "Device Owner"
                         status.isProfileOwner -> "Profile Owner"
-                        else -> "Not provisioned"
+                        status.isDeviceAdmin -> "Device Admin"
+                        else -> "Standard Access"
                     })
                 } ?: Text("Reading local device status…")
             }
