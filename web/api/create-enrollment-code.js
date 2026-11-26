@@ -12,7 +12,8 @@ function send(res, status, body) {
   return res.status(status).json(body);
 }
 function services() {
-  if (process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+  if (process.env.FIRESTORE_EMULATOR_HOST) {
+    process.env.FIREBASE_AUTH_EMULATOR_HOST ||= "127.0.0.1:9099";
     const app = getApps()[0] || initializeApp({ projectId: PROJECT_ID });
     return { auth: getAuth(app), db: getFirestore(app) };
   }
