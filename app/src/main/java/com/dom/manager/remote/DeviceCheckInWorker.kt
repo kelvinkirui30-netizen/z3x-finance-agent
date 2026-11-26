@@ -66,6 +66,10 @@ class DeviceCheckInWorker(
             when (connection.responseCode) {
                 in 200..299 -> Result.success()
                 401, 408, 429 -> Result.retry()
+                404, 410 -> {
+                    DeviceCheckInScheduler.cancel(applicationContext)
+                    Result.success()
+                }
                 in 500..599 -> Result.retry()
                 else -> Result.failure()
             }
