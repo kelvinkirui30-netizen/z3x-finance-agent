@@ -22,7 +22,12 @@ if (missing.length > 0) {
 }
 
 const firebaseConfig = {
-  ...requiredEnv,
+  apiKey: requiredEnv.apiKey!,
+  authDomain: requiredEnv.authDomain!,
+  projectId: requiredEnv.projectId!,
+  storageBucket: requiredEnv.storageBucket!,
+  messagingSenderId: requiredEnv.messagingSenderId!,
+  appId: requiredEnv.appId!,
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || undefined,
 };
 
