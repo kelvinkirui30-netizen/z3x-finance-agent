@@ -4,7 +4,6 @@ import { getAuth } from "firebase-admin/auth";
 import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 
 const PROJECT_ID = "device-owner-manager";
-const CODE_PATTERN = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/;
 function send(res, status, body) {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -30,30 +29,13 @@ export default async function handler(req, res) {
     const user = await auth.verifyIdToken(match[1], true);
     const body = req.body || {};
     const code = String(body.code || "").trim().toUpperCase();
-    if (!CODE_PATTERN.test(code)) return send(res, 400, { error: "Enter a valid 8-character enrollment code." });
+    if (!isValidEnrollmentCode(code)) return send(res, 400, { error: "Enter a valid 8-character enrollment code." });
     const installId = String(body.installId || "");
-    if (!/^[0-9a-f-]{36}$/i.test(installId)) return send(res, 400, { error: "Invalid app installation identifier." });
-    const fields = ["manufacturer", "model", "androidVersion", "appVersion", "managementMode"];
-    const device = {};
-    for (const key of fields) {
-      const value = body.device?.[key];
-      if (typeof value !== "string" || value.length > 120) {
-        return send(res, 400, { error: "Device information is incomplete or invalid." });
-      }
-      device[key] = value;
-    }
-    const sdkInt = Number(body.device?.sdkInt);
-    if (!Number.isInteger(sdkInt) || sdkInt < 21 || sdkInt > 100) {
-      return send(res, 400, { error: "Invalid Android API level." });
-    }
-    const batteryLevel = body.device?.batteryLevel == null ? null : Number(body.device.batteryLevel);
-    const isCharging = body.device?.isCharging == null ? null : body.device.isCharging;
-    if (batteryLevel !== null && (!Number.isInteger(batteryLevel) || batteryLevel < 0 || batteryLevel > 100)) {
-      return send(res, 400, { error: "Invalid battery level." });
-    }
-    if (isCharging !== null && typeof isCharging !== "boolean") {
-      return send(res, 400, { error: "Invalid charging state." });
-    }
+    if (!isValidInstallId(installId)) return send(res, 400, { error: "Invalid app installation identifier." });
+    const normalized = normalizeDevicePayload(body.device);
+    if (!normalized.ok) return send(res, 400, { error: normalized.error });
+    const { manufacturer, model, androidVersion, appVersion, managementMode, sdkInt, batteryLevel, isCharging } = normalized.value;
+    const device = { manufacturer, model, androidVersion, appVersion, managementMode };
     const codeHash = createHash("sha256").update(code).digest("hex");
     const codeRef = db.collection("enrollment_codes").doc(codeHash);
     const deviceRef = db.collection("devices").doc(installId);
