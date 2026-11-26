@@ -52,6 +52,7 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 - [x] Add Firestore Emulator test coverage and a dedicated GitHub Actions workflow for role and cross-account access scenarios.
 - [x] Firestore Emulator test workflow passes on commit `27a547cc55580c367ba8ebab57e57c2779c93a0d`.
 - [ ] Review bootstrap endpoint for atomicity, one-time use and recovery if claim assignment fails.
+- [x] Add Super Admin-only enable/disable controls to the portal account directory; the API protects the acting account and Super Admin accounts.
 
 **Exit criteria:** role tests pass; no client can grant itself a role or write server-owned records. Current work is partial and is not yet ready for Firestore production deployment.
 
@@ -117,7 +118,8 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 ### Phase 7 — Web portal completion
 - Super Admin dashboard and system settings.
 - Staff management: Admin/Assistant assignment, disable/enable and audit.
-- User management: account status, profile and owned-device view.
+- [x] User management: Super Admin account enable/disable controls and own-device view.
+- [ ] Complete profile editing and account recovery flows.
 - Device management: enrollment-code generation/revocation, inventory, capability/health view and approved safe commands.
 - Audit logs: filters by actor, device, event, outcome and date.
 - Health dashboard: stale devices, app versions, recovery events and integrity alerts.
