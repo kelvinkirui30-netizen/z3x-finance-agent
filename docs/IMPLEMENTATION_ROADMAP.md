@@ -57,20 +57,20 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 **Exit criteria:** role tests pass; no client can grant itself a role or write server-owned records. Current work is partial and is not yet ready for Firestore production deployment.
 
 ### Phase 2 — Device enrollment and ownership binding
-**Status: First end-to-end enrollment slice implemented; validation and lifecycle controls pending**
+**Status: Enrollment, authenticated check-in and owner-controlled unlinking implemented; automated validation suite passing; endpoint deployment and real-device verification pending**
 - [x] Portal generates a cryptographically random 8-character code for the signed-in account; plaintext is returned once and only a SHA-256 verifier is stored.
 - [x] Codes expire after 10 minutes and code generation is rate-limited to one request per account every 30 seconds.
 - [x] Android app accepts the code and requires an explicit confirmation before sending the enrollment request.
 - [x] Trusted API verifies the Firebase ID token and requires the same account that generated the code.
 - [x] Enrollment consumes the code and creates the device record in one Firestore transaction; repeat use and cross-account use are rejected.
 - [x] The app submits an app-generated persistent installation UUID and a limited device inventory: manufacturer, model, Android version/API, app version and actual Device Owner/Profile Owner/Standard Access state.
-- [ ] Add automated endpoint tests for expiry, replay, cross-account use, invalid payloads and transaction races.
+- [x] Add automated validation tests for code format/expiry/ownership, installation UUIDs, device payloads, management modes and enrollment state.\n- [ ] Add emulator-backed endpoint integration tests for expiry, replay, cross-account use, invalid payloads and concurrent transaction races.
 - [x] Add owner-authenticated device check-in API; it updates inventory only when the signed-in account matches the enrolled owner.
 - [x] Add network-constrained WorkManager check-ins (minimum 15-minute periodic interval) with retry on transient connectivity/server errors.
-- [ ] Add revoke/unenroll flows with audit events and device rebind policy.
-- [ ] Validate app enrollment on a real test device and verify Vercel production functions are deployed.
+- [x] Add owner-confirmed unlinking from the personal portal; preserve device history and append an audit event.\n- [x] Stop periodic check-ins after the server reports an unenrolled device.\n- [ ] Add enrollment-code revocation and explicit rebind tests.
+- [ ] Validate app enrollment, check-in and unlinking on a real test device and verify Vercel production functions are deployed.
 
-**Exit criteria:** the first enrollment flow is implemented in code; production acceptance remains pending until endpoint tests, deployed API and real-device verification pass.
+**Exit criteria:** core enrollment lifecycle is implemented and unit validation tests pass in CI; production acceptance remains pending until endpoint integration tests, deployed API and real-device verification pass.
 
 ### Phase 3 — Device identity, inventory and capability discovery
 **Status: Initial identity fields are now reported during enrollment; ongoing check-in and expanded capability discovery pending**
