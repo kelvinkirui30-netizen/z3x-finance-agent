@@ -1,6 +1,7 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { isValidInstallId, normalizeDevicePayload, isDeviceOwnedBy, isDeviceEnrolled } from "../lib/device-validation.js";
 
 const PROJECT_ID = "device-owner-manager";
 function send(res, status, body) {
@@ -28,27 +29,15 @@ export default async function handler(req, res) {
     const user = await auth.verifyIdToken(match[1], true);
     const body = req.body || {};
     const installId = String(body.installId || "");
-    if (!/^[0-9a-f-]{36}$/i.test(installId)) return send(res, 400, { error: "Invalid app installation identifier." });
-    const device = body.device || {};
-    const stringFields = ["manufacturer", "model", "androidVersion", "appVersion", "managementMode"];
-    const patch = {};
-    for (const key of stringFields) {
-      if (typeof device[key] !== "string" || device[key].length > 120) {
-        return send(res, 400, { error: "Device check-in information is incomplete or invalid." });
-      }
-      patch[key] = device[key];
-    }
-    const sdkInt = Number(device.sdkInt);
-    const batteryLevel = device.batteryLevel == null ? null : Number(device.batteryLevel);
-    const isCharging = device.isCharging == null ? null : device.isCharging;
-    if (!Number.isInteger(sdkInt) || sdkInt < 21 || sdkInt > 100) return send(res, 400, { error: "Invalid Android API level." });
-    if (batteryLevel !== null && (!Number.isInteger(batteryLevel) || batteryLevel < 0 || batteryLevel > 100)) return send(res, 400, { error: "Invalid battery level." });
-    if (isCharging !== null && typeof isCharging !== "boolean") return send(res, 400, { error: "Invalid charging state." });
+    if (!isValidInstallId(installId)) return send(res, 400, { error: "Invalid app installation identifier." });
+    const normalized = normalizeDevicePayload(body.device);
+    if (!normalized.ok) return send(res, 400, { error: normalized.error });
+    const { sdkInt, batteryLevel, isCharging, ...patch } = normalized.value;
     const ref = db.collection("devices").doc(installId);
     const snap = await ref.get();
     if (!snap.exists) return send(res, 404, { error: "This installation is not enrolled. Generate a new code in your portal." });
-    if (snap.data().ownerUid !== user.uid) return send(res, 403, { error: "This device is not linked to the signed-in account." });
-    if (snap.data().enrollmentStatus !== "enrolled") return send(res, 410, { error: "This device is no longer enrolled. Link it again from your portal if you want to resume check-ins." });
+    if (!isDeviceOwnedBy(snap.data(), user.uid)) return send(res, 403, { error: "This device is not linked to the signed-in account." });
+    if (!isDeviceEnrolled(snap.data())) return send(res, 410, { error: "This device is no longer enrolled. Link it again from your portal if you want to resume check-ins." });
     await ref.update({
       ...patch,
       sdkInt,
