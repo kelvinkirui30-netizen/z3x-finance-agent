@@ -39,7 +39,7 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 **Exit criteria:** reproducible Android and web builds; documented current state; no credentials committed.
 
 ### Phase 1 — Identity, roles and backend security
-**Status: Initial hardening committed; testing and remaining controls pending**
+**Status: Core role hardening committed; Firestore Emulator role/ownership suite passing; remaining API controls pending**
 - Complete server-side authentication middleware for every privileged API.
 - Enforce role matrix consistently in APIs, portal navigation and Firestore rules.
 - [x] Add paginated account listing, Super Admin-only role/status changes, audit events and protected Super Admin accounts.
@@ -50,22 +50,28 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 - [ ] Verify audit event immutability, endpoint failure handling and role transitions with automated tests.
 - [ ] Add Firebase App Check where compatible, rate limits, and deployment-level request protections; validate API input and generic client errors.
 - [x] Add Firestore Emulator test coverage and a dedicated GitHub Actions workflow for role and cross-account access scenarios.
-- [ ] Confirm the emulator test workflow passes; the first attempt exposed a Firebase SDK peer-version mismatch, which has been corrected in the latest dependency commit.
+- [x] Firestore Emulator test workflow passes on commit `27a547cc55580c367ba8ebab57e57c2779c93a0d`.
 - [ ] Review bootstrap endpoint for atomicity, one-time use and recovery if claim assignment fails.
 
 **Exit criteria:** role tests pass; no client can grant itself a role or write server-owned records. Current work is partial and is not yet ready for Firestore production deployment.
 
 ### Phase 2 — Device enrollment and ownership binding
-- Portal generates cryptographically random, short-lived, single-use enrollment codes for a selected account.
-- Store only a one-way verifier/hash of each code; never expose code documents to clients.
-- Android app offers a clear enrollment screen for entering the code and displaying the account/device pairing for confirmation.
-- Trusted API validates code, expiry, status, rate limits and authenticated device session; bind atomically to the intended owner UID.
-- Prevent code reuse, cross-account reassignment, duplicate device binding and race conditions.
-- Provide revoke, expire and unenroll flows with audit events.
+**Status: First end-to-end enrollment slice implemented; validation and lifecycle controls pending**
+- [x] Portal generates a cryptographically random 8-character code for the signed-in account; plaintext is returned once and only a SHA-256 verifier is stored.
+- [x] Codes expire after 10 minutes and code generation is rate-limited to one request per account every 30 seconds.
+- [x] Android app accepts the code and requires an explicit confirmation before sending the enrollment request.
+- [x] Trusted API verifies the Firebase ID token and requires the same account that generated the code.
+- [x] Enrollment consumes the code and creates the device record in one Firestore transaction; repeat use and cross-account use are rejected.
+- [x] The app submits an app-generated persistent installation UUID and a limited device inventory: manufacturer, model, Android version/API, app version and actual Device Owner/Profile Owner/Standard Access state.
+- [ ] Add automated endpoint tests for expiry, replay, cross-account use, invalid payloads and transaction races.
+- [ ] Add revoke/unenroll flows with audit events and device rebind policy.
+- [ ] Validate app enrollment on a real test device and verify Vercel production functions are deployed.
 
-**Exit criteria:** a device cannot become associated with an account without a valid code and explicit on-device confirmation.
+**Exit criteria:** the first enrollment flow is implemented in code; production acceptance remains pending until endpoint tests, deployed API and real-device verification pass.
 
 ### Phase 3 — Device identity, inventory and capability discovery
+**Status: Initial identity fields are now reported during enrollment; ongoing check-in and expanded capability discovery pending**
+- [x] Enrollment reports manufacturer, model, Android release/API, app version, app-generated installation ID and actual management mode.
 - Collect manufacturer, model, Android release/API, app version, app-generated installation ID, device display name where available, battery/charging state where permitted, and last check-in.
 - Report access mode: Standard, Device Admin (legacy), Profile Owner, or Device Owner; do not conflate these.
 - Build a capability matrix from Android version, provisioning state, permissions and actual API checks.
@@ -143,7 +149,7 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 |---|---|---|
 | Android authentication | Email/password Firebase Auth screen exists | Confirm account policy, errors and profile rules |
 | Device status | Manufacturer/model/Android/API and owner-mode check exists | Expand safe inventory and capability discovery |
-| Device enrollment | Not implemented | Phase 2 |
+| Device enrollment | One-time code generation, authenticated same-account binding, on-device confirmation and atomic consume/create flow implemented | Add endpoint tests, revoke/unenroll and real-device verification |
 | Device check-in | Not implemented end-to-end | Phases 2–4 |
 | Self-healing | Not implemented | Phase 4 |
 | Tamper monitoring | Not implemented | Phase 5 |
@@ -152,7 +158,7 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 | Staff management API | Partial endpoint exists | Harden, paginate and test Phase 1 |
 | Finance records | Rules/schema proposal exists; no complete workflows | Phase 8 |
 | Firestore rules | Draft exists in repository | Test and deploy only after review |
-| CI | Android and separate Vite web build workflows exist; web workflow hardened | Verify both workflow results and add rules/API tests |
+| CI | Firestore Emulator rules suite passes; latest Android and web builds are running for enrollment changes | Verify latest Android/web runs and add enrollment API tests |
 | Vercel | Project deployed by owner | Verify latest deployment and server functions |
 
 ## Working method
