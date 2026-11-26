@@ -46,6 +46,14 @@ export default async function handler(req, res) {
     if (!Number.isInteger(sdkInt) || sdkInt < 21 || sdkInt > 100) {
       return send(res, 400, { error: "Invalid Android API level." });
     }
+    const batteryLevel = body.device?.batteryLevel == null ? null : Number(body.device.batteryLevel);
+    const isCharging = body.device?.isCharging == null ? null : body.device.isCharging;
+    if (batteryLevel !== null && (!Number.isInteger(batteryLevel) || batteryLevel < 0 || batteryLevel > 100)) {
+      return send(res, 400, { error: "Invalid battery level." });
+    }
+    if (isCharging !== null && typeof isCharging !== "boolean") {
+      return send(res, 400, { error: "Invalid charging state." });
+    }
     const codeHash = createHash("sha256").update(code).digest("hex");
     const codeRef = db.collection("enrollment_codes").doc(codeHash);
     const deviceRef = db.collection("devices").doc(installId);
@@ -66,6 +74,8 @@ export default async function handler(req, res) {
         displayName: [device.manufacturer, device.model].filter(Boolean).join(" ") || "Android device",
         ...device,
         sdkInt,
+        batteryLevel,
+        isCharging,
         deviceName: device.model,
         enrollmentStatus: "enrolled",
         enrollmentMethod: "single_use_code",
