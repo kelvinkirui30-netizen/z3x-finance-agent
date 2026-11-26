@@ -55,7 +55,7 @@ export default async function handler(req, res) {
     const decoded = await auth.verifyIdToken(match[1], true);
 
     if (decoded.email !== ALLOWED_EMAIL || decoded.email_verified !== true) {
-      return send(res, 403, { error: "Only the verified approved Google account can complete this activation." });
+      return send(res, 403, { error: "Only the verified approved owner email account can complete this activation." });
     }
 
     const target = await auth.getUser(decoded.uid);
