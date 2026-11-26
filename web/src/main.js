@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from "firebase/auth";
 import { getFirestore, collection, getDocs, query, orderBy, limit, where } from "firebase/firestore";
 import "./styles.css";
 
@@ -19,6 +19,7 @@ const portal = $("#portal");
 const authMessage = $("#auth-message");
 let signedInUser = null;
 let currentRole = "user";
+let authMode = "signin";
 
 if (missing.length) {
   authMessage.textContent = "Website configuration is incomplete. Add the VITE_FIREBASE_* environment variables in Vercel.";
@@ -35,7 +36,7 @@ if (missing.length) {
     const button = $("#activate-super-admin");
     const message = $("#bootstrap-message");
     if (!signedInUser || signedInUser.email !== "shadowvybez001@gmail.com") {
-      message.textContent = "Sign in with the approved owner Google account first.";
+      message.textContent = "Sign in with the approved, verified owner email account first.";
       return;
     }
     if (!secret) {
@@ -65,6 +66,75 @@ if (missing.length) {
     }
   });
 
+  const authForm = $("#email-auth-form");
+  const authModeToggle = $("#auth-mode-toggle");
+  const emailSubmit = $("#email-submit");
+  const emailInput = $("#auth-email");
+  const passwordInput = $("#auth-password");
+
+  authModeToggle.addEventListener("click", () => {
+    authMode = authMode === "signin" ? "signup" : "signin";
+    emailSubmit.textContent = authMode === "signin" ? "Sign in with email" : "Create account";
+    authModeToggle.textContent = authMode === "signin" ? "Create an account" : "I already have an account";
+    passwordInput.autocomplete = authMode === "signin" ? "current-password" : "new-password";
+    authMessage.textContent = authMode === "signup" ? "Use an email address you can access. We'll send a verification link." : "";
+  });
+
+  authForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    if (password.length < 8) {
+      authMessage.textContent = "Use a password with at least 8 characters.";
+      return;
+    }
+    emailSubmit.disabled = true;
+    authMessage.textContent = authMode === "signin" ? "Signing in securely…" : "Creating your account…";
+    try {
+      if (authMode === "signup") {
+        const credential = await createUserWithEmailAndPassword(auth, email, password);
+        await sendEmailVerification(credential.user);
+        authMessage.textContent = "Account created. A verification link has been sent to " + email + ". You can now continue to the portal; verify your email to use account recovery and privileged setup.";
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (error) {
+      authMessage.textContent = friendlyError(error);
+    } finally {
+      emailSubmit.disabled = false;
+    }
+  });
+
+  $("#forgot-password").addEventListener("click", async () => {
+    const email = emailInput.value.trim();
+    if (!email) {
+      authMessage.textContent = "Enter your email address first, then select Forgot password.";
+      emailInput.focus();
+      return;
+    }
+    const resetButton = $("#forgot-password");
+    resetButton.disabled = true;
+    authMessage.textContent = "Sending password-reset email…";
+    try {
+      await sendPasswordResetEmail(auth, email);
+      authMessage.textContent = "If an account exists for that address, Firebase has sent a password-reset link. Check your inbox and spam folder.";
+    } catch (error) {
+      authMessage.textContent = friendlyError(error);
+    } finally {
+      resetButton.disabled = false;
+    }
+  });
+
+  $("#resend-verification").addEventListener("click", async () => {
+    if (!signedInUser) return;
+    try {
+      await sendEmailVerification(signedInUser);
+      authMessage.textContent = "Verification email sent. Open the link, then sign out and sign in again.";
+    } catch (error) {
+      authMessage.textContent = friendlyError(error);
+    }
+  });
+
   $("#google-signin").addEventListener("click", async () => {
     authMessage.textContent = "Opening Google sign-in…";
     try { await signInWithPopup(auth, provider); }
@@ -77,9 +147,20 @@ if (missing.length) {
       portal.classList.add("hidden");
       authScreen.classList.remove("hidden");
       $("#bootstrap-panel").classList.add("hidden");
+      $("#resend-verification").classList.add("hidden");
       return;
     }
     try {
+      const emailProvider = user.providerData.some((providerInfo) => providerInfo.providerId === "password");
+      if (emailProvider && !user.emailVerified) {
+        portal.classList.add("hidden");
+        authScreen.classList.remove("hidden");
+        $("#bootstrap-panel").classList.add("hidden");
+        $("#resend-verification").classList.remove("hidden");
+        authMessage.textContent = "Please verify your email address before entering the portal. Check your inbox or request another verification email below.";
+        return;
+      }
+      $("#resend-verification").classList.add("hidden");
       const token = await user.getIdTokenResult(true);
       const role = token.claims.role || "user";
       if (role !== "super_admin" && role !== "admin" && role !== "assistant" && role !== "user") {
@@ -124,7 +205,18 @@ if (missing.length) {
 function friendlyError(error) {
   if (error?.code === "auth/unauthorized-domain") return "Add this Vercel domain to Firebase Authentication → Settings → Authorized domains.";
   if (error?.code === "auth/popup-closed-by-user") return "Sign-in was cancelled.";
-  return error?.message || "Unable to sign in. Please try again.";
+  const messages = {
+    "auth/email-already-in-use": "An account already exists for this email. Sign in instead.",
+    "auth/invalid-email": "Enter a valid email address.",
+    "auth/invalid-credential": "Email or password is incorrect.",
+    "auth/user-not-found": "No account was found for that email. Create an account first.",
+    "auth/wrong-password": "Email or password is incorrect.",
+    "auth/weak-password": "Choose a stronger password with at least 8 characters.",
+    "auth/too-many-requests": "Too many attempts. Wait a little and try again.",
+    "auth/network-request-failed": "Network connection failed. Check your internet and retry.",
+    "auth/missing-password": "Enter your password."
+  };
+  return messages[error?.code] || error?.message || "Unable to sign in. Please try again.";
 }
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[c]);
