@@ -108,6 +108,7 @@ if (missing.length) {
         $("#page-title").textContent = "My account";
         await loadPersonalDashboard(db, user);
         $("#refresh-my-data").onclick = () => loadPersonalDashboard(db, user);
+        wireEnrollmentCode(user);
       } else {
         await loadDashboard(db);
         wireNavigation(db);
@@ -280,4 +281,37 @@ function wireNavigation(db) {
     });
   });
   $("#refresh").onclick = () => loadDashboard(db);
+}
+
+
+function wireEnrollmentCode(user) {
+  const button = $("#generate-enrollment-code");
+  const output = $("#enrollment-code-result");
+  if (!button || button.dataset.wired) return;
+  button.dataset.wired = "1";
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    output.textContent = "Generating a secure one-time code…";
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/create-enrollment-code", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token }
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not create an enrollment code.");
+      output.innerHTML = '<div><b style="font-size:28px;letter-spacing:5px">' + escapeHtml(result.code) +
+        '</b></div><p>Enter this code in the Z3X app on your device. It expires at ' +
+        escapeHtml(new Date(result.expiresAt).toLocaleTimeString()) +
+        ' and can only be used once by this account.</p><button class="btn secondary" id="copy-enrollment-code" type="button">Copy code</button>';
+      $("#copy-enrollment-code").addEventListener("click", async () => {
+        try { await navigator.clipboard.writeText(result.code); showToast("Enrollment code copied."); }
+        catch { showToast("Copy is unavailable. You can select the code and copy it manually."); }
+      });
+    } catch (error) {
+      output.textContent = error.message || "Enrollment code generation failed.";
+    } finally {
+      button.disabled = false;
+    }
+  });
 }
