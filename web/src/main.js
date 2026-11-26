@@ -171,6 +171,28 @@ function showToast(message) {
   setTimeout(() => el.classList.remove("show"), 3500);
 }
 
+
+async function loadPersonalDashboard(db, user) {
+  const [devices, schedules, payments] = await Promise.all([
+    getDocs(query(collection(db, "devices"), where("ownerUid", "==", user.uid))),
+    getDocs(query(collection(db, "device_installments"), where("ownerUid", "==", user.uid))),
+    getDocs(query(collection(db, "device_installment_payments"), where("ownerUid", "==", user.uid)))
+  ]);
+  $("#my-device-count").textContent = devices.size;
+  $("#my-schedule-count").textContent = schedules.size;
+  $("#my-payment-count").textContent = payments.size;
+  $("#my-role").textContent = "User";
+  const deviceData = devices.docs.map((d) => d.data());
+  $("#my-device-list").innerHTML = deviceData.length
+    ? deviceData.map((d) => '<div class="activity-row"><b>' + escapeHtml(d.displayName || d.deviceName || d.model || "Registered device") + '</b><span class="subline">Status: ' + escapeHtml(d.enrollmentStatus || "Not reported") + '</span></div>').join("")
+    : "No devices are linked to your account yet.";
+  const scheduleData = schedules.docs.map((d) => d.data());
+  const paymentData = payments.docs.map((d) => d.data());
+  const financeRows = scheduleData.map((d) => '<div class="activity-row"><b>Schedule</b><span class="subline">' + escapeHtml(d.currencyCode || "") + " " + escapeHtml(d.amountMinor ?? "—") + '</span></div>')
+    .concat(paymentData.map((d) => '<div class="activity-row"><b>Payment record</b><span class="subline">' + escapeHtml(d.currencyCode || "") + " " + escapeHtml(d.amountMinor ?? "—") + '</span></div>'));
+  $("#my-finance-list").innerHTML = financeRows.length ? financeRows.join("") : "No finance records are available yet.";
+}
+
 async function staffApi(method = "GET", body) {
   if (!signedInUser) throw new Error("Please sign in again.");
   const token = await signedInUser.getIdToken();
