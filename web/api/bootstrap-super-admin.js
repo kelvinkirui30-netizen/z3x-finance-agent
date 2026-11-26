@@ -68,14 +68,21 @@ export default async function handler(req, res) {
     await db.runTransaction(async (transaction) => {
       const lock = await transaction.get(lockRef);
       if (lock.exists) {
-        const error = new Error("BOOTSTRAP_ALREADY_USED");
-        throw error;
+        const data = lock.data() || {};
+        if (data.status === "completed") throw new Error("BOOTSTRAP_ALREADY_USED");
+        if (data.ownerUid !== uid) throw new Error("BOOTSTRAP_LOCKED_TO_ANOTHER_ACCOUNT");
+        transaction.update(lockRef, {
+          status: "in_progress",
+          lastAttemptAt: FieldValue.serverTimestamp()
+        });
+        return;
       }
       transaction.create(lockRef, {
         status: "in_progress",
         ownerUid: uid,
         ownerEmail: ALLOWED_EMAIL,
-        startedAt: FieldValue.serverTimestamp()
+        startedAt: FieldValue.serverTimestamp(),
+        lastAttemptAt: FieldValue.serverTimestamp()
       });
     });
 
@@ -94,7 +101,10 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     if (error?.message === "BOOTSTRAP_ALREADY_USED") {
-      return send(res, 409, { error: "The one-time Super Admin activation has already been used or is locked. Do not retry; contact the project owner for a controlled recovery." });
+      return send(res, 409, { error: "The one-time Super Admin activation has already been completed." });
+    }
+    if (error?.message === "BOOTSTRAP_LOCKED_TO_ANOTHER_ACCOUNT") {
+      return send(res, 409, { error: "The activation is reserved for a different account." });
     }
     console.error("Super Admin bootstrap failed:", error?.message || "Unknown error");
     return send(res, 500, { error: "Activation failed. Check the private Firebase Admin credential and Vercel function logs." });
