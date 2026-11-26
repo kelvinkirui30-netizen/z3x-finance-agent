@@ -239,8 +239,9 @@ private fun DeviceDashboard(
                             repository.enrollCurrentDevice(context, enrollmentCode, snapshot) { result ->
                                 enrollmentBusy = false
                                 result.onSuccess {
+                                    DeviceCheckInScheduler.schedule(context.applicationContext)
                                     enrollmentCode = ""
-                                    enrollmentMessage = "Device successfully linked. Your device list will update automatically."
+                                    enrollmentMessage = "Device successfully linked. Background check-ins are scheduled when Android permits."
                                 }.onFailure {
                                     enrollmentMessage = it.localizedMessage ?: "Device enrollment failed."
                                 }
