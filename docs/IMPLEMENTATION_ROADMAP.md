@@ -65,6 +65,8 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 - [x] Enrollment consumes the code and creates the device record in one Firestore transaction; repeat use and cross-account use are rejected.
 - [x] The app submits an app-generated persistent installation UUID and a limited device inventory: manufacturer, model, Android version/API, app version and actual Device Owner/Profile Owner/Standard Access state.
 - [ ] Add automated endpoint tests for expiry, replay, cross-account use, invalid payloads and transaction races.
+- [x] Add owner-authenticated device check-in API; it updates inventory only when the signed-in account matches the enrolled owner.
+- [x] Add network-constrained WorkManager check-ins (minimum 15-minute periodic interval) with retry on transient connectivity/server errors.
 - [ ] Add revoke/unenroll flows with audit events and device rebind policy.
 - [ ] Validate app enrollment on a real test device and verify Vercel production functions are deployed.
 
@@ -75,6 +77,7 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 - [x] Enrollment reports manufacturer, model, Android release/API, app version, app-generated installation ID and actual management mode (including Device Admin).
 - [x] Capture battery percentage and charging state through Android's BatteryManager when available.
 - [x] Show the enrolled device's reported model, Android version, management mode, battery and last-seen time in the personal portal.
+- [x] Refresh device telemetry through authenticated periodic check-ins when network connectivity is available.
 - Collect manufacturer, model, Android release/API, app version, app-generated installation ID, device display name where available, battery/charging state where permitted, and last check-in.
 - Report access mode: Standard, Device Admin (legacy), Profile Owner, or Device Owner; do not conflate these.
 - Build a capability matrix from Android version, provisioning state, permissions and actual API checks.
@@ -85,7 +88,8 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 
 ### Phase 4 — Android reliability and self-healing
 - Add a health model for app process/service status, last successful sync, scheduled work, permission state and policy/config version.
-- Use Android-supported WorkManager jobs for deferrable health checks and synchronization.
+- [x] Use Android-supported WorkManager jobs for network-constrained device check-ins and synchronization.
+- Use Android-supported WorkManager jobs for remaining deferrable health checks and synchronization.
 - Recover transient failures with bounded retries, backoff, idempotent operations and crash-safe local state.
 - Restore the app's own validated configuration from trusted server state; keep safe local defaults if offline.
 - On boot, schedule eligible work and refresh status when Android permits.
@@ -154,7 +158,7 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 | Android authentication | Email/password Firebase Auth screen exists | Confirm account policy, errors and profile rules |
 | Device status | Manufacturer/model/Android/API, Device Owner/Profile Owner/Device Admin/Standard Access, battery/charging reported on enrollment | Add ongoing check-in, capability matrix and battery refresh |
 | Device enrollment | One-time code generation, authenticated same-account binding, on-device confirmation and atomic consume/create flow implemented | Add endpoint tests, revoke/unenroll and real-device verification |
-| Device check-in | Not implemented end-to-end | Phases 2–4 |
+| Device check-in | Owner-verified API and 15-minute minimum periodic WorkManager check-in implemented | Real-device verification, offline queue validation and health model |
 | Self-healing | Not implemented | Phase 4 |
 | Tamper monitoring | Not implemented | Phase 5 |
 | Signed commands | Not implemented | Phase 6 |
