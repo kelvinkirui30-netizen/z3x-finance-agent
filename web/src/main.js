@@ -28,6 +28,7 @@ if (missing.length) {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
   let signedInUser = null;
+  let currentRole = "user";
 
   $("#activate-super-admin").addEventListener("click", async () => {
     const secret = $("#bootstrap-secret").value;
@@ -94,12 +95,15 @@ if (missing.length) {
         }
         return;
       }
+      currentRole = role || "user";
+      $("#staff-nav").classList.toggle("hidden", currentRole !== "super_admin");
       $("#bootstrap-panel").classList.add("hidden");
       authScreen.classList.add("hidden");
       portal.classList.remove("hidden");
       $("#avatar").textContent = (user.displayName || user.email || "A").slice(0, 1).toUpperCase();
       await loadDashboard(db);
       wireNavigation(db);
+      wireAdminTools();
     } catch (error) {
       await signOut(auth);
       authMessage.textContent = friendlyError(error);
