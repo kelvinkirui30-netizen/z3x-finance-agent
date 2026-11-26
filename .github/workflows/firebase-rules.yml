@@ -20,6 +20,8 @@ on:
       - "package.json"
       - "package-lock.json"
       - "tests/**"
+      - "web/api/**"
+      - "web/lib/**"
       - ".github/workflows/firebase-rules.yml"
   workflow_dispatch:
 
