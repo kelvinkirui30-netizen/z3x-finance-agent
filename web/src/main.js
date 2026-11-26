@@ -97,7 +97,7 @@ if (missing.length) {
       document.querySelectorAll(".nav[data-view='policies'], .nav[data-view='applications'], .nav[data-view='compliance'], .nav[data-view='activity']").forEach((el) => el.classList.toggle("hidden", currentRole === "user"));
       document.querySelectorAll(".nav[data-view='devices']").forEach((el) => el.classList.toggle("hidden", currentRole === "user"));
       document.querySelectorAll(".nav[data-view='overview']").forEach((el) => el.classList.toggle("hidden", currentRole === "user"));
-      document.querySelectorAll(".nav[data-view='users']").forEach((el) => el.classList.toggle("hidden", !["super_admin", "admin", "assistant"].includes(currentRole)));
+      document.querySelectorAll(".nav[data-view='users']").forEach((el) => el.classList.toggle("hidden", !["super_admin", "admin"].includes(currentRole)));
       $("#bootstrap-panel").classList.add("hidden");
       authScreen.classList.add("hidden");
       portal.classList.remove("hidden");
@@ -193,10 +193,12 @@ async function loadPersonalDashboard(db, user) {
   $("#my-finance-list").innerHTML = financeRows.length ? financeRows.join("") : "No finance records are available yet.";
 }
 
-async function staffApi(method = "GET", body) {
+async function staffApi(method = "GET", body, pageToken) {
   if (!signedInUser) throw new Error("Please sign in again.");
   const token = await signedInUser.getIdToken();
-  const response = await fetch("/api/super-admin-users", {
+  const url = new URL("/api/super-admin-users", window.location.origin);
+  if (pageToken) url.searchParams.set("pageToken", pageToken);
+  const response = await fetch(url, {
     method,
     headers: { Authorization: "Bearer " + token, ...(body ? { "Content-Type": "application/json" } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {})
@@ -205,28 +207,42 @@ async function staffApi(method = "GET", body) {
   if (!response.ok) throw new Error(result.error || "Account request failed.");
   return result;
 }
-async function loadAccounts() {
+let accountPageToken = null;
+let accountRows = [];
+
+async function loadAccounts({ append = false } = {}) {
   const usersEl = $("#user-rows");
   const staffEl = $("#staff-rows");
-  if (!usersEl || !staffEl) return;
-  usersEl.innerHTML = '<tr><td colspan="5" class="empty">Loading accounts…</td></tr>';
-  staffEl.innerHTML = '<tr><td colspan="4" class="empty">Loading staff…</td></tr>';
+  if (!usersEl || !staffEl || !["super_admin", "admin"].includes(currentRole)) return;
+  if (!append) {
+    accountPageToken = null;
+    accountRows = [];
+    usersEl.innerHTML = '<tr><td colspan="5" class="empty">Loading accounts…</td></tr>';
+    staffEl.innerHTML = '<tr><td colspan="4" class="empty">Loading staff…</td></tr>';
+  }
   try {
-    const result = await staffApi("GET");
-    const users = result.users || [];
+    const result = await staffApi("GET", undefined, append ? accountPageToken : undefined);
+    accountRows = append ? accountRows.concat(result.users || []) : (result.users || []);
+    accountPageToken = result.nextPageToken || null;
+    const users = accountRows;
     const staff = users.filter((u) => ["super_admin", "admin", "assistant"].includes(u.role));
     usersEl.innerHTML = users.length ? users.map((u) => '<tr><td><b>' + escapeHtml(u.displayName || "Unnamed account") + '</b><span class="subline">' + escapeHtml(u.email) + '</span><span class="subline">' + escapeHtml(u.uid) + '</span></td><td>' + pill(u.role) + '</td><td>' + (u.disabled ? "Disabled" : "Enabled") + '</td><td>' + (u.emailVerified ? "Verified" : "Not verified") + '</td><td>' + date(u.lastSignInAt) + '</td></tr>').join("") : '<tr><td colspan="5" class="empty">No accounts found.</td></tr>';
     staffEl.innerHTML = staff.length ? staff.map((u) => '<tr><td><b>' + escapeHtml(u.displayName || u.email) + '</b><span class="subline">' + escapeHtml(u.email) + '</span></td><td>' + pill(u.role) + '</td><td>' + (u.disabled ? "Disabled" : "Enabled") + '</td><td>' + date(u.lastSignInAt) + '</td></tr>').join("") : '<tr><td colspan="4" class="empty">No staff accounts assigned yet.</td></tr>';
+    const more = $("#load-more-accounts");
+    if (more) more.classList.toggle("hidden", !accountPageToken);
   } catch (error) {
-    usersEl.innerHTML = '<tr><td colspan="5" class="empty">' + escapeHtml(error.message) + '</td></tr>';
-    staffEl.innerHTML = '<tr><td colspan="4" class="empty">' + escapeHtml(error.message) + '</td></tr>';
+    if (!append) {
+      usersEl.innerHTML = '<tr><td colspan="5" class="empty">' + escapeHtml(error.message) + '</td></tr>';
+      staffEl.innerHTML = '<tr><td colspan="4" class="empty">' + escapeHtml(error.message) + '</td></tr>';
+    } else showToast(error.message);
   }
 }
 
 
 function wireAdminTools() {
   $("#refresh-users")?.addEventListener("click", loadAccounts);
-  $("#refresh-staff")?.addEventListener("click", loadAccounts);
+  $("#refresh-staff")?.addEventListener("click", () => loadAccounts());
+  $("#load-more-accounts")?.addEventListener("click", () => loadAccounts({ append: true }));
   $("#save-staff-role")?.addEventListener("click", async () => {
     const message = $("#staff-message");
     const button = $("#save-staff-role");
@@ -247,7 +263,7 @@ function wireAdminTools() {
       button.disabled = false;
     }
   });
-  loadAccounts();
+  if (["super_admin", "admin"].includes(currentRole)) loadAccounts();
 }
 
 function wireNavigation(db) {
