@@ -26,6 +26,7 @@ data class ManagedDevice(
     val managementMode: String,
     val enrollmentStatus: String,
     val batteryLevel: Long?,
+    val isCharging: Boolean?,
     val lastSeenAt: Timestamp?
 )
 
@@ -99,6 +100,7 @@ class FirebaseStatusRepository(
                     managementMode = doc.getString("managementMode").orEmpty(),
                     enrollmentStatus = doc.getString("enrollmentStatus").orEmpty(),
                     batteryLevel = doc.getLong("batteryLevel"),
+                    isCharging = doc.getBoolean("isCharging"),
                     lastSeenAt = doc.getTimestamp("lastSeenAt")
                 )
             })
@@ -134,6 +136,7 @@ class FirebaseStatusRepository(
                 val managementMode = when {
                     snapshot.isDeviceOwner -> "device_owner"
                     snapshot.isProfileOwner -> "profile_owner"
+                    snapshot.isDeviceAdmin -> "device_admin"
                     else -> "standard_access"
                 }
                 val payload = JSONObject().apply {
@@ -146,6 +149,8 @@ class FirebaseStatusRepository(
                         put("sdkInt", snapshot.sdkInt)
                         put("appVersion", BuildConfig.VERSION_NAME)
                         put("managementMode", managementMode)
+                        snapshot.batteryLevel?.let { put("batteryLevel", it) }
+                        snapshot.isCharging?.let { put("isCharging", it) }
                     })
                 }
                 Thread {
