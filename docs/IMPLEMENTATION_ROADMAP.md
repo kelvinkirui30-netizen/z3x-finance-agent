@@ -49,7 +49,8 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 - [x] Make account changes single-operation and append requested/completed/failed audit events; clients cannot modify audit records.
 - [ ] Verify audit event immutability, endpoint failure handling and role transitions with automated tests.
 - [ ] Add Firebase App Check where compatible, rate limits, and deployment-level request protections; validate API input and generic client errors.
-- [ ] Add emulator/rules tests for all four roles and cross-account access attempts.
+- [x] Add Firestore Emulator test coverage and a dedicated GitHub Actions workflow for role and cross-account access scenarios.
+- [ ] Confirm the emulator test workflow passes; the first attempt exposed a Firebase SDK peer-version mismatch, which has been corrected in the latest dependency commit.
 - [ ] Review bootstrap endpoint for atomicity, one-time use and recovery if claim assignment fails.
 
 **Exit criteria:** role tests pass; no client can grant itself a role or write server-owned records. Current work is partial and is not yet ready for Firestore production deployment.
