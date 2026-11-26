@@ -27,6 +27,42 @@ if (missing.length) {
   const db = getFirestore(app);
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
+  let signedInUser = null;
+
+  $("#activate-super-admin").addEventListener("click", async () => {
+    const secret = $("#bootstrap-secret").value;
+    const button = $("#activate-super-admin");
+    const message = $("#bootstrap-message");
+    if (!signedInUser || signedInUser.email !== "shadowvybez001@gmail.com") {
+      message.textContent = "Sign in with the approved owner Google account first.";
+      return;
+    }
+    if (!secret) {
+      message.textContent = "Enter the one-time activation secret from Vercel.";
+      return;
+    }
+    button.disabled = true;
+    message.textContent = "Verifying your account and activating Super Admin…";
+    try {
+      const idToken = await signedInUser.getIdToken();
+      const response = await fetch("/api/bootstrap-super-admin", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + idToken,
+          "x-bootstrap-secret": secret
+        }
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Activation failed.");
+      await signedInUser.getIdToken(true);
+      message.textContent = "Super Admin activated. Refreshing your portal…";
+      $("#bootstrap-secret").value = "";
+      setTimeout(() => location.reload(), 700);
+    } catch (error) {
+      message.textContent = error.message || "Activation failed. Please check the Vercel settings.";
+      button.disabled = false;
+    }
+  });
 
   $("#google-signin").addEventListener("click", async () => {
     authMessage.textContent = "Opening Google sign-in…";
@@ -35,19 +71,30 @@ if (missing.length) {
   });
   $("#signout").addEventListener("click", () => signOut(auth));
   onAuthStateChanged(auth, async (user) => {
+    signedInUser = user;
     if (!user) {
       portal.classList.add("hidden");
       authScreen.classList.remove("hidden");
+      $("#bootstrap-panel").classList.add("hidden");
       return;
     }
     try {
       const token = await user.getIdTokenResult(true);
       const role = token.claims.role;
       if (!["super_admin", "admin", "assistant"].includes(role)) {
-        await signOut(auth);
-        authMessage.textContent = "This account is signed in but has no approved portal staff role. Ask the project owner to grant the correct role.";
+        portal.classList.add("hidden");
+        authScreen.classList.remove("hidden");
+        if (user.email === "shadowvybez001@gmail.com") {
+          $("#bootstrap-panel").classList.remove("hidden");
+          authMessage.textContent = "Owner account verified. Complete the one-time activation below.";
+        } else {
+          $("#bootstrap-panel").classList.add("hidden");
+          await signOut(auth);
+          authMessage.textContent = "This account does not have an approved staff role.";
+        }
         return;
       }
+      $("#bootstrap-panel").classList.add("hidden");
       authScreen.classList.add("hidden");
       portal.classList.remove("hidden");
       $("#avatar").textContent = (user.displayName || user.email || "A").slice(0, 1).toUpperCase();
