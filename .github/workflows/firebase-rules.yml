@@ -1,0 +1,45 @@
+name: Firebase Rules Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "firestore.rules"
+      - "firebase.json"
+      - "package.json"
+      - "package-lock.json"
+      - "tests/**"
+      - ".github/workflows/firebase-rules.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "firestore.rules"
+      - "firebase.json"
+      - "package.json"
+      - "package-lock.json"
+      - "tests/**"
+      - ".github/workflows/firebase-rules.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rules-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install test dependencies
+        run: npm install --no-audit --no-fund
+      - name: Test Firestore rules in emulator
+        run: npm run test:rules
