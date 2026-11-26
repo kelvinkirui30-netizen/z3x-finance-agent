@@ -115,3 +115,15 @@ test("enrollment code generation is rate limited per account", async () => {
   const second = await invoke(createCode, owner.token);
   assert.equal(second.statusCode, 429);
 });
+
+test("simultaneous redemption of one code can create only one enrollment", async () => {
+  const owner = await createUser("race");
+  const created = await invoke(createCode, owner.token);
+  assert.equal(created.statusCode, 200);
+  const payload = { code: created.body.code, installId: randomUUID(), device };
+  const results = await Promise.all([
+    invoke(enrollDevice, owner.token, payload),
+    invoke(enrollDevice, owner.token, payload)
+  ]);
+  assert.deepEqual(results.map((result) => result.statusCode).sort(), [200, 410]);
+});
