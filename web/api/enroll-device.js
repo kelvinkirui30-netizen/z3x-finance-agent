@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
-import { isValidInstallId, isValidEnrollmentCode, normalizeDevicePayload, isEnrollmentCodeUsable } from "../lib/device-validation.js";
+import { isValidInstallId, isValidEnrollmentCode, normalizeDevicePayload, isEnrollmentCodeUsable, isDeviceEnrolled } from "../lib/device-validation.js";
 
 const PROJECT_ID = "device-owner-manager";
 function send(res, status, body) {
@@ -55,6 +55,9 @@ export default async function handler(req, res) {
       }
       if (deviceSnap.exists && deviceSnap.data().ownerUid !== user.uid) {
         throw Object.assign(new Error("This app installation is already linked to another account."), { status: 409 });
+      }
+      if (deviceSnap.exists && isDeviceEnrolled(deviceSnap.data())) {
+        throw Object.assign(new Error("This installation is already enrolled. Unlink it from the current account before enrolling it again."), { status: 409 });
       }
       tx.set(deviceRef, {
         ownerUid: user.uid,
