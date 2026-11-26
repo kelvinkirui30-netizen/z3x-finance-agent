@@ -48,6 +48,7 @@ export default async function handler(req, res) {
     if (typeof uid !== "string" || !uid.trim()) return send(res, 400, { error: "A valid account UID is required." });
     if (uid === actor.uid) return send(res, 400, { error: "You cannot change your own account role or status here." });
     const target = await auth.getUser(uid);
+    if (target.customClaims?.role === "super_admin") return send(res, 403, { error: "Super Admin accounts are protected from role changes here." });
     if (target.email === "shadowvybez001@gmail.com") return send(res, 403, { error: "The initial Super Admin account is protected." });
 
     if (role !== undefined) {
