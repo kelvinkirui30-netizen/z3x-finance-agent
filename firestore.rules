@@ -139,7 +139,8 @@ service cloud.firestore {
     }
 
     match /device_locations/{locationId} {
-      allow read: if isStaff()
+      // Location data is sensitive: only Admin/Super Admin or the owner may read it.
+      allow read: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid);
       allow create, update, delete: if false;
     }
