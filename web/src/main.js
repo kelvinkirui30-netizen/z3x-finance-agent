@@ -161,6 +161,37 @@ function showToast(message) {
   el.classList.add("show");
   setTimeout(() => el.classList.remove("show"), 3500);
 }
+
+async function staffApi(method = "GET", body) {
+  if (!signedInUser) throw new Error("Please sign in again.");
+  const token = await signedInUser.getIdToken();
+  const response = await fetch("/api/super-admin-users", {
+    method,
+    headers: { Authorization: "Bearer " + token, ...(body ? { "Content-Type": "application/json" } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {})
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Account request failed.");
+  return result;
+}
+async function loadAccounts() {
+  const usersEl = $("#user-rows");
+  const staffEl = $("#staff-rows");
+  if (!usersEl || !staffEl) return;
+  usersEl.innerHTML = '<tr><td colspan="5" class="empty">Loading accounts…</td></tr>';
+  staffEl.innerHTML = '<tr><td colspan="4" class="empty">Loading staff…</td></tr>';
+  try {
+    const result = await staffApi("GET");
+    const users = result.users || [];
+    const staff = users.filter((u) => ["super_admin", "admin", "assistant"].includes(u.role));
+    usersEl.innerHTML = users.length ? users.map((u) => '<tr><td><b>' + escapeHtml(u.displayName || "Unnamed account") + '</b><span class="subline">' + escapeHtml(u.email) + '</span><span class="subline">' + escapeHtml(u.uid) + '</span></td><td>' + pill(u.role) + '</td><td>' + (u.disabled ? "Disabled" : "Enabled") + '</td><td>' + (u.emailVerified ? "Verified" : "Not verified") + '</td><td>' + date(u.lastSignInAt) + '</td></tr>').join("") : '<tr><td colspan="5" class="empty">No accounts found.</td></tr>';
+    staffEl.innerHTML = staff.length ? staff.map((u) => '<tr><td><b>' + escapeHtml(u.displayName || u.email) + '</b><span class="subline">' + escapeHtml(u.email) + '</span></td><td>' + pill(u.role) + '</td><td>' + (u.disabled ? "Disabled" : "Enabled") + '</td><td>' + date(u.lastSignInAt) + '</td></tr>').join("") : '<tr><td colspan="4" class="empty">No staff accounts assigned yet.</td></tr>';
+  } catch (error) {
+    usersEl.innerHTML = '<tr><td colspan="5" class="empty">' + escapeHtml(error.message) + '</td></tr>';
+    staffEl.innerHTML = '<tr><td colspan="4" class="empty">' + escapeHtml(error.message) + '</td></tr>';
+  }
+}
+
 function wireNavigation(db) {
   document.querySelectorAll("[data-view], [data-go]").forEach((el) => {
     if (el.dataset.wired) return;
