@@ -45,7 +45,11 @@ export default async function handler(req, res) {
       if (!codeSnap.exists) throw Object.assign(new Error("This code is invalid or has expired."), { status: 404 });
       const data = codeSnap.data();
       if (data.ownerUid !== user.uid) throw Object.assign(new Error("Sign in using the same account that generated this code."), { status: 403 });
-      if (data.status !== "pending" || !data.expiresAt || data.expiresAt.toMillis() <= now.toMillis()) {
+      if (!isEnrollmentCodeUsable({
+        ownerUid: data.ownerUid,
+        status: data.status,
+        expiresAtMillis: data.expiresAt?.toMillis()
+      }, user.uid, now.toMillis())) {
         throw Object.assign(new Error("This code has expired or has already been used. Generate a new code."), { status: 410 });
       }
       if (deviceSnap.exists && deviceSnap.data().ownerUid !== user.uid) {
