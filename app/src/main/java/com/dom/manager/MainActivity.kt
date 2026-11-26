@@ -149,7 +149,11 @@ private fun DeviceDashboard(
     val context = androidx.compose.ui.platform.LocalContext.current
     var localStatus by remember { mutableStateOf<com.dom.manager.device.DeviceSnapshot?>(null) }
     LaunchedEffect(userId) {
-        DeviceCheckInScheduler.schedule(context.applicationContext)
+        val identityPrefs = context.applicationContext.getSharedPreferences("z3x_device_identity", MODE_PRIVATE)
+        val enrolledForThisAccount = identityPrefs.getBoolean("is_enrolled", false) &&
+            identityPrefs.getString("owner_uid", null) == userId
+        if (enrolledForThisAccount) DeviceCheckInScheduler.schedule(context.applicationContext)
+        else DeviceCheckInScheduler.cancel(context.applicationContext)
         localStatus = DeviceStatusRepository(context.applicationContext).read()
     }
 
