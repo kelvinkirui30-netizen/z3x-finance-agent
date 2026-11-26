@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b1020" />
+  <meta name="description" content="Z3X Finance Agent authorized device management portal." />
+  <title>Z3X Finance Agent · Management Portal</title>
+</head>
+<body>
+  <div id="app">
+    <section class="auth-shell" id="auth-screen">
+      <div class="auth-card">
+        <div class="brand-mark">Z</div>
+        <p class="eyebrow">Z3X FINANCE AGENT</p>
+        <h1>Management Portal</h1>
+        <p class="muted">Sign in with an authorized administrator account.</p>
+        <button class="btn primary full-width" id="google-signin">Continue with Google</button>
+        <p class="auth-message" id="auth-message" role="status"></p>
+        <small>Access is restricted to accounts with an approved staff role.</small>
+      </div>
+    </section>
+
+    <div class="shell hidden" id="portal">
+      <aside class="sidebar">
+        <a class="brand" href="#"><span class="brand-mark">Z</span><span><b>Z3X</b><small>FINANCE AGENT</small></span></a>
+        <div class="nav-label">WORKSPACE</div>
+        <button class="nav active" data-view="overview"><span>▦</span> Overview</button>
+        <button class="nav" data-view="devices"><span>▣</span> Devices <i id="nav-device-count">0</i></button>
+        <button class="nav" data-view="policies"><span>◇</span> Policies</button>
+        <button class="nav" data-view="applications"><span>▤</span> Applications</button>
+        <button class="nav" data-view="compliance"><span>✓</span> Compliance</button>
+        <div class="nav-label second">ADMINISTRATION</div>
+        <button class="nav" data-view="activity"><span>◷</span> Activity log</button>
+        <div class="sidebar-bottom"><div class="status-dot"></div><div><b>Firebase connected</b><small>Authorized admin workspace</small></div></div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div><div class="eyebrow">DEVICE OPERATIONS / CONTROL CENTRE</div><h1 id="page-title">Overview</h1></div>
+          <div class="top-actions"><span class="secure">● Secure Firebase session</span><span class="avatar" id="avatar">A</span><button class="btn secondary" id="signout">Sign out</button></div>
+        </header>
+
+        <section class="welcome">
+          <div><div class="eyebrow light">Z3X MANAGEMENT</div><h2>Device operations, clearly in view.</h2><p>Monitor enrolled devices and review recorded compliance information.</p></div>
+          <div class="welcome-symbol">Z3X</div>
+        </section>
+
+        <section id="view-overview" class="view">
+          <div class="section-head"><div><h3>Operations snapshot</h3><p>Live records read from Firebase Firestore.</p></div><button class="btn secondary" id="refresh">↻ Refresh</button></div>
+          <div class="metrics">
+            <article class="metric"><div class="metric-top"><span>Total devices</span><span class="metric-icon">▣</span></div><strong id="m-devices">—</strong><small>Registered in portal</small></article>
+            <article class="metric"><div class="metric-top"><span>Enrolled</span><span class="metric-icon green">✓</span></div><strong id="m-enrolled">—</strong><small>Enrollment records</small></article>
+            <article class="metric"><div class="metric-top"><span>Compliant</span><span class="metric-icon blue">◇</span></div><strong id="m-compliant">—</strong><small>Latest recorded status</small></article>
+            <article class="metric"><div class="metric-top"><span>Active policies</span><span class="metric-icon purple">⌘</span></div><strong id="m-policies">—</strong><small>Enabled policy records</small></article>
+          </div>
+          <div class="content-grid">
+            <article class="panel"><div class="panel-head"><div><h3>Recent activity</h3><p>Administrative events from Firestore</p></div><button class="text-btn" data-go="activity">View log →</button></div><div id="activity-preview" class="empty">Loading activity…</div></article>
+            <article class="panel quick-panel"><div class="panel-head"><div><h3>Quick actions</h3><p>Available portal sections</p></div></div><button class="quick-action" data-go="devices"><span class="quick-icon">▣</span><span><b>Review devices</b><small>View authorized device inventory</small></span><span class="arrow">→</span></button><button class="quick-action" data-go="policies"><span class="quick-icon">◇</span><span><b>Review policies</b><small>See approved policy records</small></span><span class="arrow">→</span></button><button class="quick-action" data-go="compliance"><span class="quick-icon">✓</span><span><b>Check compliance</b><small>Review recorded device status</small></span><span class="arrow">→</span></button></article>
+          </div>
+          <div class="notice"><b>Integration status</b><span>This portal reads Firebase data. Device enrollment and trusted check-in services are separate steps and are not yet active.</span></div>
+        </section>
+
+        <section id="view-devices" class="view hidden">
+          <div class="section-head"><div><h3>Device inventory</h3><p>Devices associated with authorized accounts.</p></div></div>
+          <div class="panel"><div class="table-wrap"><table><thead><tr><th>DEVICE</th><th>MODEL</th><th>ENROLLMENT</th><th>BATTERY</th><th>LAST SEEN</th></tr></thead><tbody id="device-rows"><tr><td colspan="5" class="empty">Loading device inventory…</td></tr></tbody></table></div></div>
+        </section>
+        <section id="view-policies" class="view hidden"><div class="section-head"><div><h3>Policy centre</h3><p>Review policy records. No policy changes are issued from this portal yet.</p></div></div><div class="panel"><div id="policy-rows" class="empty large">Loading policy records…</div></div></section>
+        <section id="view-applications" class="view hidden"><div class="section-head"><div><h3>Application management</h3><p>Application inventory is not connected yet.</p></div></div><div class="panel"><div class="empty large">The Android agent must report permitted app inventory before this section can show live data.</div></div></section>
+        <section id="view-compliance" class="view hidden"><div class="section-head"><div><h3>Compliance centre</h3><p>Recorded device enrollment and compliance status.</p></div></div><div class="panel"><div class="table-wrap"><table><thead><tr><th>DEVICE</th><th>ENROLLMENT</th><th>COMPLIANCE</th><th>LAST SEEN</th></tr></thead><tbody id="compliance-rows"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody></table></div></div></section>
+        <section id="view-activity" class="view hidden"><div class="section-head"><div><h3>Activity log</h3><p>Traceable administrative events.</p></div></div><div class="panel"><div id="activity-full" class="empty">Loading activity…</div></div></section>
+        <footer>© 2026 Z3X Finance Agent <span>Authorized device administration only</span></footer>
+      </main>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="status"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
