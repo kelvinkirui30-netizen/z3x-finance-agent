@@ -65,6 +65,7 @@ export default async function handler(req, res) {
     });
     return send(res, 200, { code, expiresAt: expiresAt.toDate().toISOString(), expiresInSeconds: 600 });
   } catch (error) {
+    if (process.env.FIRESTORE_EMULATOR_HOST) console.error("Enrollment API emulator test error:", error);
     return send(res, error.status || 500, {
       error: error.status ? error.message : "Unable to create an enrollment code. Check server configuration."
     });
