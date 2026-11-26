@@ -12,6 +12,10 @@ function send(res, status, body) {
   return res.status(status).json(body);
 }
 function services() {
+  if (process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+    const app = getApps()[0] || initializeApp({ projectId: PROJECT_ID });
+    return { auth: getAuth(app), db: getFirestore(app) };
+  }
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) throw new Error("Missing Firebase Admin credential.");
   const account = JSON.parse(raw);
