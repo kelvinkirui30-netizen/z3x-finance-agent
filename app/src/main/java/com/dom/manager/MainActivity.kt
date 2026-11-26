@@ -30,6 +30,7 @@ class MainActivity : ComponentActivity() {
 private fun Z3XApp() {
     val repository = remember { FirebaseStatusRepository() }
     var user by remember { mutableStateOf(repository.currentUser()) }
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
     if (user == null) {
         AuthenticationScreen(repository) { user = it }
     } else {
@@ -37,7 +38,11 @@ private fun Z3XApp() {
             userId = user!!.uid,
             email = user!!.email.orEmpty(),
             repository = repository,
-            onSignOut = { repository.signOut(); user = null }
+            onSignOut = {
+                DeviceCheckInScheduler.cancel(appContext)
+                repository.signOut()
+                user = null
+            }
         )
     }
 }
