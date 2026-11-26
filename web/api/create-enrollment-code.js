@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   }
   try {
     const { auth, db } = services();
-    const match = String(req.headers.authorization || "").match(/^Bearer\\s+(.+)$/i);
+    const match = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i);
     if (!match) return send(res, 401, { error: "Sign in is required." });
     const user = await auth.verifyIdToken(match[1], true);
     const code = newCode();
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     const codeRef = db.collection("enrollment_codes").doc(codeHash);
     await db.runTransaction(async (tx) => {
       const existing = await tx.get(db.collection("enrollment_codes")
-        .where("ownerUid", "==", user.uid).where("status", "==", "pending").limit(3));
+        .where("ownerUid", "==", user.uid).where("status", "==", "pending").where("expiresAt", ">", now).limit(3));
       if (existing.size >= 3) {
         const error = new Error("You already have three active enrollment codes. Wait for them to expire or use one.");
         error.status = 429;
