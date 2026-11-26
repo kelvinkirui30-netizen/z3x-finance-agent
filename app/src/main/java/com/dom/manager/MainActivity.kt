@@ -3,114 +3,212 @@ package com.dom.manager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.dom.manager.device.DeviceStatusRepository
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.dom.manager.remote.FirebaseStatusRepository
+import com.dom.manager.remote.ManagedDevice
+import com.google.firebase.auth.FirebaseUser
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    Dashboard()
-                }
-            }
-        }
+        setContent { MaterialTheme { Surface(Modifier.fillMaxSize()) { Z3XApp() } } }
     }
 }
 
 @Composable
-private fun Dashboard() {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    var snapshot by remember { mutableStateOf<com.dom.manager.device.DeviceSnapshot?>(null) }
+private fun Z3XApp() {
+    val repository = remember { FirebaseStatusRepository() }
+    var user by remember { mutableStateOf(repository.currentUser()) }
+    if (user == null) {
+        AuthenticationScreen(repository) { user = it }
+    } else {
+        DeviceDashboard(
+            userId = user!!.uid,
+            email = user!!.email.orEmpty(),
+            repository = repository,
+            onSignOut = { repository.signOut(); user = null }
+        )
+    }
+}
 
-    LaunchedEffect(Unit) {
-        snapshot = withContext(Dispatchers.IO) {
-            DeviceStatusRepository(context.applicationContext).read()
+@Composable
+private fun AuthenticationScreen(
+    repository: FirebaseStatusRepository,
+    onAuthenticated: (FirebaseUser) -> Unit
+) {
+    var createAccount by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("Z3X Finance Agent", style = MaterialTheme.typography.headlineMedium)
+        Spacer(Modifier.height(8.dp))
+        Text(if (createAccount) "Create your account to access your devices." else "Sign in to manage devices assigned to your account.")
+        Spacer(Modifier.height(24.dp))
+        if (createAccount) {
+            OutlinedTextField(name, { name = it }, label = { Text("Full name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(12.dp))
         }
+        OutlinedTextField(
+            email, { email = it }, label = { Text("Email address") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            singleLine = true, modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(
+            password, { password = it }, label = { Text("Password") },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            singleLine = true, modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = {
+                message = null
+                if (email.isBlank() || password.length < 6 || (createAccount && name.isBlank())) {
+                    message = "Enter a valid email, a password of at least 6 characters, and your name when creating an account."
+                    return@Button
+                }
+                busy = true
+                val callback: (Result<FirebaseUser>) -> Unit = { result ->
+                    busy = false
+                    result.onSuccess(onAuthenticated).onFailure {
+                        message = it.localizedMessage ?: "Authentication failed."
+                    }
+                }
+                if (createAccount) repository.createAccount(name, email, password, callback)
+                else repository.signIn(email, password, callback)
+            },
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (busy) CircularProgressIndicator()
+            else Text(if (createAccount) "Create account" else "Sign in")
+        }
+        TextButton(
+            onClick = { createAccount = !createAccount; message = null },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (createAccount) "Already registered? Sign in" else "New here? Create an account")
+        }
+        message?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "Authentication is handled by Firebase. Device records are visible only to their assigned owner and authorized staff.",
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
+
+@Composable
+private fun DeviceDashboard(
+    userId: String,
+    email: String,
+    repository: FirebaseStatusRepository,
+    onSignOut: () -> Unit
+) {
+    var devices by remember { mutableStateOf<List<ManagedDevice>>(emptyList()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var loading by remember { mutableStateOf(true) }
+
+    DisposableEffect(userId) {
+        val registration = repository.observeMyDevices(
+            uid = userId,
+            onChange = { devices = it; loading = false; error = null },
+            onError = { loading = false; error = it.localizedMessage ?: "Unable to load devices." }
+        )
+        onDispose { registration.remove() }
+    }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var localStatus by remember { mutableStateOf<com.dom.manager.device.DeviceSnapshot?>(null) }
+    LaunchedEffect(Unit) {
+        localStatus = DeviceStatusRepository(context.applicationContext).read()
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text("Z3X Finance Agent", style = MaterialTheme.typography.headlineMedium)
-        Text("Native Android DPC starter", style = MaterialTheme.typography.bodyMedium)
-
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("Z3X Finance Agent", style = MaterialTheme.typography.headlineSmall)
+                Text(email, style = MaterialTheme.typography.bodySmall)
+            }
+            TextButton(onClick = onSignOut) { Text("Sign out") }
+        }
+        Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Device overview", style = MaterialTheme.typography.titleLarge)
-                if (snapshot == null) {
-                    Text("Reading device information…")
-                } else {
-                    val s = snapshot!!
-                    InfoRow("Manufacturer", s.manufacturer)
-                    InfoRow("Model", s.model)
-                    InfoRow("Android", s.androidVersion)
-                    InfoRow("API level", s.sdkInt.toString())
+                Text("My devices", style = MaterialTheme.typography.titleLarge)
+                Text("${devices.size} device(s) assigned to this account")
+                when {
+                    loading -> CircularProgressIndicator()
+                    error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
+                    devices.isEmpty() -> Text("No devices are registered to your account yet.")
+                    else -> devices.forEach { DeviceCard(it) }
                 }
             }
         }
-
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Management enrollment", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    when {
-                        snapshot?.isDeviceOwner == true -> "Device Owner: active"
-                        snapshot?.isProfileOwner == true -> "Profile Owner: active"
-                        snapshot == null -> "Checking enrollment…"
-                        else -> "Not enrolled as Device Owner or Profile Owner"
-                    }
-                )
-                Text(
-                    "Installing the APK does not grant Device Owner privileges. " +
-                    "Use Android's supported provisioning process on a device you own."
-                )
+                Text("This phone", style = MaterialTheme.typography.titleLarge)
+                localStatus?.let { status ->
+                    InfoRow("Model", "${status.manufacturer} ${status.model}")
+                    InfoRow("Android", status.androidVersion)
+                    InfoRow("API level", status.sdkInt.toString())
+                    InfoRow("Management", when {
+                        status.isDeviceOwner -> "Device Owner"
+                        status.isProfileOwner -> "Profile Owner"
+                        else -> "Not provisioned"
+                    })
+                } ?: Text("Reading local device status…")
             }
         }
+        Text(
+            "Cloud device status will appear here after a trusted enrollment and check-in service is configured. Installing this app alone does not enroll a device.",
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
 
-        Text("Modules planned", style = MaterialTheme.typography.titleLarge)
-        listOf(
-            "App inventory and approved-app policies",
-            "Kiosk / lock-task configuration",
-            "Security policy status",
-            "Network policy status",
-            "Firebase-authenticated remote administration",
-            "Compliance reports and audit history"
-        ).forEach { item ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Text(item, Modifier.padding(16.dp))
-            }
+@Composable
+private fun DeviceCard(device: ManagedDevice) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                device.displayName.ifBlank {
+                    "${device.manufacturer} ${device.model}".trim().ifBlank { "Managed device" }
+                },
+                style = MaterialTheme.typography.titleMedium
+            )
+            InfoRow("Enrollment", device.enrollmentStatus.ifBlank { "Unknown" })
+            InfoRow("Management", device.managementMode.ifBlank { "Not specified" })
+            if (device.androidVersion.isNotBlank()) InfoRow("Android", device.androidVersion)
+            device.batteryLevel?.let { InfoRow("Battery", "$it%") }
+            device.lastSeenAt?.let { InfoRow("Last check-in", it.toDate().toString()) }
         }
     }
 }
 
 @Composable
 private fun InfoRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, style = MaterialTheme.typography.bodyMedium)
         Text(value, style = MaterialTheme.typography.bodyMedium)
     }
