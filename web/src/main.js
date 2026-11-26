@@ -183,9 +183,9 @@ async function loadPersonalDashboard(db, user) {
   $("#my-schedule-count").textContent = schedules.size;
   $("#my-payment-count").textContent = payments.size;
   $("#my-role").textContent = "User";
-  const deviceData = devices.docs.map((d) => d.data());
+  const deviceData = devices.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   $("#my-device-list").innerHTML = deviceData.length
-    ? deviceData.map((d) => '<div class="activity-row"><b>' + escapeHtml(d.displayName || d.deviceName || d.model || "Registered device") + '</b><span class="subline">Status: ' + escapeHtml(d.enrollmentStatus || "Not reported") + ' · Access: ' + escapeHtml(d.managementMode || "Unknown") + '</span><span class="subline">' + escapeHtml([d.manufacturer, d.model, d.androidVersion ? "Android " + d.androidVersion : ""].filter(Boolean).join(" · ")) + '</span><span class="subline">' + (Number.isFinite(d.batteryLevel) ? "Battery: " + escapeHtml(d.batteryLevel) + "%" + (d.isCharging ? " · Charging" : "") : "Battery: not reported") + '</span><span class="subline">Last seen: ' + date(d.lastSeenAt) + '</span></div>').join("")
+    ? deviceData.map((d) => '<div class="activity-row"><b>' + escapeHtml(d.displayName || d.deviceName || d.model || "Registered device") + '</b><span class="subline">Status: ' + escapeHtml(d.enrollmentStatus || "Not reported") + ' · Access: ' + escapeHtml(d.managementMode || "Unknown") + '</span><span class="subline">' + escapeHtml([d.manufacturer, d.model, d.androidVersion ? "Android " + d.androidVersion : ""].filter(Boolean).join(" · ")) + '</span><span class="subline">' + (Number.isFinite(d.batteryLevel) ? "Battery: " + escapeHtml(d.batteryLevel) + "%" + (d.isCharging ? " · Charging" : "") : "Battery: not reported") + '</span><span class="subline">Last seen: ' + date(d.lastSeenAt) + '</span>' + (d.enrollmentStatus === "enrolled" ? '<button class="btn secondary" type="button" data-unenroll-device="' + escapeHtml(d.id) + '">Unlink device</button>' : '') + '</div>').join("")
     : "No devices are linked to your account yet.";
   const scheduleData = schedules.docs.map((d) => d.data());
   const paymentData = payments.docs.map((d) => d.data());
@@ -311,6 +311,32 @@ function wireNavigation(db) {
 function wireEnrollmentCode(user) {
   const button = $("#generate-enrollment-code");
   const output = $("#enrollment-code-result");
+  const deviceList = $("#my-device-list");
+  if (deviceList && !deviceList.dataset.unenrollWired) {
+    deviceList.dataset.unenrollWired = "1";
+    deviceList.addEventListener("click", async (event) => {
+      const action = event.target.closest("[data-unenroll-device]");
+      if (!action) return;
+      const installId = action.dataset.unenrollDevice;
+      if (!installId || !window.confirm("Unlink this device from your account? Check-ins will stop. Its existing records will be retained.")) return;
+      action.disabled = true;
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch("/api/unenroll-device", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+          body: JSON.stringify({ installId })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Could not unlink this device.");
+        showToast(result.message || "Device unlinked.");
+        await loadPersonalDashboard(db, user);
+      } catch (error) {
+        showToast(error.message || "Device unlink failed.");
+        action.disabled = false;
+      }
+    });
+  }
   if (!button || button.dataset.wired) return;
   button.dataset.wired = "1";
   button.addEventListener("click", async () => {
