@@ -37,14 +37,18 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 **Audit findings:** Android has a starter Firebase email/password flow and basic local device status only. The portal has a partial role-aware scaffold and a Firebase Admin SDK account endpoint. Enrollment, check-in, health recovery, tamper reporting, signed commands and complete finance workflows are not implemented. Firestore rules are draft-only and have not been deployed. Separate Android and web CI workflows are present; the web workflow now has read-only repository permissions and Node 22. No build result is claimed from this source inspection.\n\n**Exit criteria:** reproducible Android and web builds; documented current state; no credentials committed.
 
 ### Phase 1 — Identity, roles and backend security
+**Status: Initial hardening committed; testing and remaining controls pending**
 - Complete server-side authentication middleware for every privileged API.
 - Enforce role matrix consistently in APIs, portal navigation and Firestore rules.
-- Add paginated account listing, safe role/status changes, immutable audit records and Super Admin safeguards.
-- Add Firebase App Check where compatible, input validation, rate limits, CORS/CSRF protections where applicable, and generic client errors.
-- Add emulator/rules tests for all four roles and cross-account access attempts.
-- Review bootstrap endpoint for atomicity, one-time use and recovery if claim assignment fails.
+- [x] Add paginated account listing, Super Admin-only role/status changes, audit events and protected Super Admin accounts.
+- [x] Restrict the full account directory to Admin and Super Admin; Assistant cannot browse all accounts.
+- [x] Restrict finance record reads to Admin/Super Admin and owner; validate profile display-name writes and policy document IDs.
+- [ ] Verify audit event immutability, endpoint failure handling and role transitions with automated tests.
+- [ ] Add Firebase App Check where compatible, rate limits, and deployment-level request protections; validate API input and generic client errors.
+- [ ] Add emulator/rules tests for all four roles and cross-account access attempts.
+- [ ] Review bootstrap endpoint for atomicity, one-time use and recovery if claim assignment fails.
 
-**Exit criteria:** role tests pass; no client can grant itself a role or write server-owned records.
+**Exit criteria:** role tests pass; no client can grant itself a role or write server-owned records. Current work is partial and is not yet ready for Firestore production deployment.
 
 ### Phase 2 — Device enrollment and ownership binding
 - Portal generates cryptographically random, short-lived, single-use enrollment codes for a selected account.
