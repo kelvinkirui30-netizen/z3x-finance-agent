@@ -185,7 +185,7 @@ async function loadPersonalDashboard(db, user) {
   $("#my-role").textContent = "User";
   const deviceData = devices.docs.map((d) => d.data());
   $("#my-device-list").innerHTML = deviceData.length
-    ? deviceData.map((d) => '<div class="activity-row"><b>' + escapeHtml(d.displayName || d.deviceName || d.model || "Registered device") + '</b><span class="subline">Status: ' + escapeHtml(d.enrollmentStatus || "Not reported") + '</span></div>').join("")
+    ? deviceData.map((d) => '<div class="activity-row"><b>' + escapeHtml(d.displayName || d.deviceName || d.model || "Registered device") + '</b><span class="subline">Status: ' + escapeHtml(d.enrollmentStatus || "Not reported") + ' · Access: ' + escapeHtml(d.managementMode || "Unknown") + '</span><span class="subline">' + escapeHtml([d.manufacturer, d.model, d.androidVersion ? "Android " + d.androidVersion : ""].filter(Boolean).join(" · ")) + '</span><span class="subline">' + (Number.isFinite(d.batteryLevel) ? "Battery: " + escapeHtml(d.batteryLevel) + "%" + (d.isCharging ? " · Charging" : "") : "Battery: not reported") + '</span><span class="subline">Last seen: ' + date(d.lastSeenAt) + '</span></div>').join("")
     : "No devices are linked to your account yet.";
   const scheduleData = schedules.docs.map((d) => d.data());
   const paymentData = payments.docs.map((d) => d.data());
