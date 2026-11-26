@@ -40,11 +40,12 @@ export default async function handler(req, res) {
     const now = Timestamp.now();
     const expiresAt = Timestamp.fromMillis(now.toMillis() + 10 * 60 * 1000);
     const codeRef = db.collection("enrollment_codes").doc(codeHash);
+    const limiterRef = db.collection("enrollment_rate_limits").doc(user.uid);
     await db.runTransaction(async (tx) => {
-      const existing = await tx.get(db.collection("enrollment_codes")
-        .where("ownerUid", "==", user.uid).where("status", "==", "pending").where("expiresAt", ">", now).limit(3));
-      if (existing.size >= 3) {
-        const error = new Error("You already have three active enrollment codes. Wait for them to expire or use one.");
+      const limiter = await tx.get(limiterRef);
+      const lastIssuedAt = limiter.exists ? limiter.data().lastIssuedAt : null;
+      if (lastIssuedAt && now.toMillis() - lastIssuedAt.toMillis() < 30000) {
+        const error = new Error("Please wait 30 seconds before generating another enrollment code.");
         error.status = 429;
         throw error;
       }
@@ -55,6 +56,7 @@ export default async function handler(req, res) {
         createdAt: FieldValue.serverTimestamp(),
         expiresAt
       });
+      tx.set(limiterRef, { lastIssuedAt: now }, { merge: true });
     });
     return send(res, 200, { code, expiresAt: expiresAt.toDate().toISOString(), expiresInSeconds: 600 });
   } catch (error) {
