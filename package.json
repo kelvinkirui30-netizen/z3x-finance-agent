@@ -5,8 +5,9 @@
   "scripts": {
     "test:rules": "firebase emulators:exec --only firestore --project demo-z3x-finance-agent \"node --test tests/firestore.rules.test.js\"",
     "test:api": "node --test tests/device-validation.test.js",
-    "test": "npm run test:api && npm run test:api-syntax && npm run test:rules",
-    "test:api-syntax": "node --check web/api/create-enrollment-code.js && node --check web/api/enroll-device.js && node --check web/api/device-checkin.js && node --check web/api/unenroll-device.js"
+    "test": "npm run test:api && npm run test:api-syntax && npm run test:api-imports && npm run test:rules",
+    "test:api-syntax": "node --check web/api/create-enrollment-code.js && node --check web/api/enroll-device.js && node --check web/api/device-checkin.js && node --check web/api/unenroll-device.js",
+    "test:api-imports": "node --test tests/api-handler.test.js"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.2",
