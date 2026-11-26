@@ -14,6 +14,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.dom.manager.device.DeviceStatusRepository
+import com.dom.manager.remote.DeviceCheckInScheduler
 import com.dom.manager.remote.FirebaseStatusRepository
 import com.dom.manager.remote.ManagedDevice
 import com.google.firebase.auth.FirebaseUser
@@ -142,7 +143,8 @@ private fun DeviceDashboard(
 
     val context = androidx.compose.ui.platform.LocalContext.current
     var localStatus by remember { mutableStateOf<com.dom.manager.device.DeviceSnapshot?>(null) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(userId) {
+        DeviceCheckInScheduler.schedule(context.applicationContext)
         localStatus = DeviceStatusRepository(context.applicationContext).read()
     }
 
