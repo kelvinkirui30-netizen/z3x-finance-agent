@@ -1,6 +1,7 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { isValidInstallId, isDeviceOwnedBy, isDeviceEnrolled } from "../lib/device-validation.js";
 
 const PROJECT_ID = "device-owner-manager";
 function send(res, status, body) {
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
     if (!match) return send(res, 401, { error: "Sign in is required." });
     const user = await auth.verifyIdToken(match[1], true);
     const installId = String(req.body?.installId || "");
-    if (!/^[0-9a-f-]{36}$/i.test(installId)) {
+    if (!isValidInstallId(installId)) {
       return send(res, 400, { error: "Invalid app installation identifier." });
     }
     const deviceRef = db.collection("devices").doc(installId);
@@ -35,10 +36,10 @@ export default async function handler(req, res) {
       const snap = await tx.get(deviceRef);
       if (!snap.exists) throw Object.assign(new Error("Device record not found."), { status: 404 });
       const device = snap.data();
-      if (device.ownerUid !== user.uid) {
+      if (!isDeviceOwnedBy(device, user.uid)) {
         throw Object.assign(new Error("Only the account that owns this device can unlink it."), { status: 403 });
       }
-      if (device.enrollmentStatus !== "enrolled") {
+      if (!isDeviceEnrolled(device)) {
         throw Object.assign(new Error("This device is already unlinked."), { status: 409 });
       }
       tx.update(deviceRef, {
