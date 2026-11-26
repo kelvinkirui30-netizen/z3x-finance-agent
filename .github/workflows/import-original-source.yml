@@ -1,0 +1,97 @@
+name: Import original Sentinel source archive
+
+on:
+  push:
+    paths:
+      - "*.zip"
+      - "**/*.zip"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract original project safely
+        id: extract
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, zipfile, stat
+          candidates = sorted(
+              p for p in pathlib.Path(".").glob("*.zip")
+              if p.is_file() and p.name.lower().endswith(".zip")
+          )
+          if not candidates:
+              raise SystemExit("No ZIP archive found in the repository root. Upload the original project ZIP and rerun.")
+          archive = candidates[-1]
+          destination = pathlib.Path("legacy-source")
+          if destination.exists():
+              raise SystemExit("legacy-source/ already exists; refusing to overwrite an earlier import.")
+          destination.mkdir()
+          max_total = 150 * 1024 * 1024
+          total = 0
+          blocked_parts = {".git", ".github", "node_modules", "dist", "build", ".next", ".turbo"}
+          blocked_names = {".env", ".env.local", ".env.production", ".env.development"}
+          with zipfile.ZipFile(archive) as zf:
+              for info in zf.infolist():
+                  raw = pathlib.PurePosixPath(info.filename)
+                  parts = [p for p in raw.parts if p not in ("", ".")]
+                  if not parts or raw.is_absolute() or ".." in parts:
+                      continue
+                  if any(p in blocked_parts for p in parts):
+                      continue
+                  name = parts[-1]
+                  lower = name.lower()
+                  if name in blocked_names or lower.startswith(".env."):
+                      continue
+                  if lower.endswith((".jks", ".keystore", ".pem", ".p12", ".pfx", ".key")):
+                      continue
+                  if lower in ("service-account.json", "serviceaccountkey.json"):
+                      continue
+                  mode = info.external_attr >> 16
+                  if stat.S_ISLNK(mode):
+                      continue
+                  if info.is_dir():
+                      continue
+                  total += info.file_size
+                  if total > max_total:
+                      raise SystemExit("Archive expands beyond the 150 MiB safety limit.")
+                  # Strip a single common enclosing project folder.
+                  relative = parts[1:] if len(parts) > 1 and len({x.filename.split("/")[0] for x in zf.infolist() if "/" in x.filename}) == 1 else parts
+                  if not relative:
+                      continue
+                  target = destination.joinpath(*relative)
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  with zf.open(info) as src, target.open("wb") as dst:
+                      while True:
+                          chunk = src.read(1024 * 1024)
+                          if not chunk:
+                              break
+                          dst.write(chunk)
+          if not any(destination.iterdir()):
+              raise SystemExit("No safe source files were extracted.")
+          for p in candidates:
+              p.unlink()
+          print(f"Imported {archive.name} into legacy-source/ (excluding environment files, private keys, build output, and nested GitHub workflows).")
+          PY
+
+      - name: Commit imported source
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No source changes to commit."
+            exit 0
+          fi
+          git commit -m "Import original Sentinel project source for Firebase migration"
+          git push
