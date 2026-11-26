@@ -54,6 +54,19 @@
           <div class="welcome-symbol">Z3X</div>
         </section>
 
+        <section id="view-user-home" class="view hidden">
+          <div class="section-head"><div><h3>My account</h3><p>Your personal Z3X Finance Agent information.</p></div><button class="btn secondary" id="refresh-my-data">↻ Refresh</button></div>
+          <div class="metrics">
+            <article class="metric"><div class="metric-top"><span>My devices</span></div><strong id="my-device-count">—</strong><small>Devices linked to your account</small></article>
+            <article class="metric"><div class="metric-top"><span>My schedules</span></div><strong id="my-schedule-count">—</strong><small>Personal finance schedules</small></article>
+            <article class="metric"><div class="metric-top"><span>My payments</span></div><strong id="my-payment-count">—</strong><small>Recorded payment entries</small></article>
+            <article class="metric"><div class="metric-top"><span>Account role</span></div><strong id="my-role">User</strong><small>Personal account access</small></article>
+          </div>
+          <div class="content-grid">
+            <article class="panel"><div class="panel-head"><div><h3>My devices</h3><p>Only devices linked to your account.</p></div></div><div id="my-device-list" class="empty">Loading your devices…</div></article>
+            <article class="panel"><div class="panel-head"><div><h3>My finance records</h3><p>Your recorded schedules and payments.</p></div></div><div id="my-finance-list" class="empty">Loading your records…</div></article>
+          </div>
+        </section>
         <section id="view-overview" class="view">
           <div class="section-head"><div><h3>Operations snapshot</h3><p>Live records read from Firebase Firestore.</p></div><button class="btn secondary" id="refresh">↻ Refresh</button></div>
           <div class="metrics">
