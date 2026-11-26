@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
@@ -88,6 +89,9 @@ export default async function handler(req, res) {
     if (disabled !== undefined && typeof disabled !== "boolean") {
       return send(res, 400, { error: "Account status must be enabled or disabled." });
     }
+    if (role !== undefined && disabled !== undefined) {
+      return send(res, 400, { error: "Change an account role or status in separate operations." });
+    }
     if (uid === actor.uid) {
       return send(res, 400, { error: "You cannot change your own account role or status here." });
     }
@@ -99,28 +103,66 @@ export default async function handler(req, res) {
 
     const oldRole = target.customClaims?.role || "user";
     const oldDisabled = Boolean(target.disabled);
-    const nextClaims = { ...(target.customClaims || {}) };
-    if (role !== undefined) {
-      delete nextClaims.role;
-      if (role !== "user") nextClaims.role = role;
-      await auth.setCustomUserClaims(uid, nextClaims);
-    }
-    if (disabled !== undefined) {
-      await auth.updateUser(uid, { disabled });
-    }
-
-    await db.collection("audit_logs").add({
-      action: role !== undefined ? "account_role_changed" : "account_status_changed",
+    const requestId = randomUUID();
+    const change = role !== undefined
+      ? { kind: "role", previousValue: oldRole, newValue: role }
+      : { kind: "status", previousValue: oldDisabled, newValue: disabled };
+    const auditBase = {
+      requestId,
       actorUid: actor.uid,
       actorEmail: actor.email || "",
       targetUid: uid,
       targetEmail: target.email || "",
-      previousRole: oldRole,
-      newRole: role !== undefined ? role : oldRole,
-      previousDisabled: oldDisabled,
-      disabled: disabled !== undefined ? disabled : oldDisabled,
+      changeKind: change.kind,
+      previousValue: change.previousValue,
+      requestedValue: change.newValue
+    };
+
+    // Record intent before touching Firebase Authentication. Audit records are
+    // append-only from clients; the server writes separate outcome events.
+    await db.collection("audit_logs").add({
+      ...auditBase,
+      action: "account_change_requested",
       createdAt: FieldValue.serverTimestamp()
     });
+
+    try {
+      if (role !== undefined) {
+        const nextClaims = { ...(target.customClaims || {}) };
+        delete nextClaims.role;
+        if (role !== "user") nextClaims.role = role;
+        await auth.setCustomUserClaims(uid, nextClaims);
+      } else {
+        await auth.updateUser(uid, { disabled });
+      }
+    } catch (operationError) {
+      try {
+        await db.collection("audit_logs").add({
+          ...auditBase,
+          action: "account_change_failed",
+          failureCode: String(operationError?.code || "unknown").slice(0, 80),
+          createdAt: FieldValue.serverTimestamp()
+        });
+      } catch (auditError) {
+        console.error("Unable to record failed account change:", auditError?.message || "Unknown audit error");
+      }
+      throw operationError;
+    }
+
+    try {
+      await db.collection("audit_logs").add({
+        ...auditBase,
+        action: "account_change_completed",
+        createdAt: FieldValue.serverTimestamp()
+      });
+    } catch (auditError) {
+      console.error("Account change completed but outcome audit write failed:", auditError?.message || "Unknown audit error");
+      return send(res, 202, {
+        success: true,
+        auditPending: true,
+        message: "The account change was applied, but its completion audit entry could not be saved. Review server logs before retrying."
+      });
+    }
 
     return send(res, 200, {
       success: true,
