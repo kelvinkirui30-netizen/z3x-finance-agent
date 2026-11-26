@@ -36,4 +36,8 @@ The rules in `firestore.rules` implement the base separation:
 
 ## Implementation status
 
-This commit defines the permission boundary in Firestore rules. The rules are not automatically deployed by a GitHub commit. Role-specific dashboard screens, a trusted Super Admin role-management endpoint, first-owner bootstrap, and rules testing/deployment are separate implementation steps. Do not grant a staff role until those server-side controls are in place.
+The portal now includes role-aware navigation, a normal-user self-service view, staff/user account listings, and a trusted Firebase Admin SDK endpoint for account listing and Super Admin-only role changes. The endpoint writes role-change events through the Admin SDK to the audit log.
+
+The web build passed in GitHub Actions for commit 427fba99b5116048f9967d553ed4c8e0f3d87f65. Vercel deployment and live Firebase integration still need confirmation. Firestore rules remain a separate deployment: a GitHub commit does not publish them to Firebase. Test the rules in the Firebase Emulator or Rules Playground before deploying. The personal dashboard expects records to carry ownerUid matching the authenticated Firebase UID. Finance data remains display-only; no payments are initiated by the portal.
+
+Only the Super Admin can change staff roles. Normal users are restricted to queries for their own devices and finance records. Staff role changes are made server-side and require the caller's verified Super Admin custom claim.
