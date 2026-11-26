@@ -17,6 +17,12 @@
         <p class="muted">Sign in with an authorized administrator account.</p>
         <button class="btn primary full-width" id="google-signin">Continue with Google</button>
         <p class="auth-message" id="auth-message" role="status"></p>
+        <div id="bootstrap-panel" class="hidden">
+          <label for="bootstrap-secret">One-time Super Admin activation secret</label>
+          <input id="bootstrap-secret" type="password" autocomplete="off" placeholder="Paste the secret saved in Vercel" />
+          <button class="btn primary full-width" id="activate-super-admin" type="button">Activate Super Admin</button>
+          <p class="auth-message" id="bootstrap-message" role="status"></p>
+        </div>
         <small>Access is restricted to accounts with an approved staff role.</small>
       </div>
     </section>
