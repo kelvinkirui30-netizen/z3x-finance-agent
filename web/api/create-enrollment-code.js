@@ -3,7 +3,9 @@ import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 
-const PROJECT_ID = "device-owner-manager";
+const PROJECT_ID = process.env.FIRESTORE_EMULATOR_HOST
+  ? (process.env.FIREBASE_PROJECT_ID || "device-owner-manager")
+  : "device-owner-manager";
 const ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 
 function send(res, status, body) {
