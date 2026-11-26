@@ -34,7 +34,9 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 - Confirm the Android build workflow and harden the existing separate Vite web build workflow.
 - Document deployment steps and secrets required without exposing secret values.
 
-**Audit findings:** Android has a starter Firebase email/password flow and basic local device status only. The portal has a partial role-aware scaffold and a Firebase Admin SDK account endpoint. Enrollment, check-in, health recovery, tamper reporting, signed commands and complete finance workflows are not implemented. Firestore rules are draft-only and have not been deployed. Separate Android and web CI workflows are present; the web workflow now has read-only repository permissions and Node 22. No build result is claimed from this source inspection.\n\n**Exit criteria:** reproducible Android and web builds; documented current state; no credentials committed.
+**Audit findings:** Android has a starter Firebase email/password flow and basic local device status only. The portal has a partial role-aware scaffold and a Firebase Admin SDK account endpoint. Enrollment, check-in, health recovery, tamper reporting, signed commands and complete finance workflows are not implemented. Firestore rules are draft-only and have not been deployed. Separate Android and web CI workflows are present; the web workflow now has read-only repository permissions and Node 22. No build result is claimed from this source inspection.
+
+**Exit criteria:** reproducible Android and web builds; documented current state; no credentials committed.
 
 ### Phase 1 — Identity, roles and backend security
 **Status: Initial hardening committed; testing and remaining controls pending**
@@ -43,6 +45,8 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 - [x] Add paginated account listing, Super Admin-only role/status changes, audit events and protected Super Admin accounts.
 - [x] Restrict the full account directory to Admin and Super Admin; Assistant cannot browse all accounts.
 - [x] Restrict finance record reads to Admin/Super Admin and owner; validate profile display-name writes and policy document IDs.
+- [x] Restrict device-location reads to Admin/Super Admin and the device owner; assistants cannot browse location history.
+- [x] Make account changes single-operation and append requested/completed/failed audit events; clients cannot modify audit records.
 - [ ] Verify audit event immutability, endpoint failure handling and role transitions with automated tests.
 - [ ] Add Firebase App Check where compatible, rate limits, and deployment-level request protections; validate API input and generic client errors.
 - [ ] Add emulator/rules tests for all four roles and cross-account access attempts.
