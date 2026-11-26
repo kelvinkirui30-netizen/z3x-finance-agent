@@ -192,6 +192,33 @@ async function loadAccounts() {
   }
 }
 
+
+function wireAdminTools() {
+  $("#refresh-users")?.addEventListener("click", loadAccounts);
+  $("#refresh-staff")?.addEventListener("click", loadAccounts);
+  $("#save-staff-role")?.addEventListener("click", async () => {
+    const message = $("#staff-message");
+    const button = $("#save-staff-role");
+    const uid = $("#staff-uid").value.trim();
+    const role = $("#staff-role").value;
+    if (currentRole !== "super_admin") { message.textContent = "Only Super Admin can change staff roles."; return; }
+    if (!uid) { message.textContent = "Enter the target Firebase Authentication UID."; return; }
+    button.disabled = true;
+    message.textContent = "Saving account role securely…";
+    try {
+      const result = await staffApi("POST", { uid, role });
+      message.textContent = result.message;
+      $("#staff-uid").value = "";
+      await loadAccounts();
+    } catch (error) {
+      message.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+  loadAccounts();
+}
+
 function wireNavigation(db) {
   document.querySelectorAll("[data-view], [data-go]").forEach((el) => {
     if (el.dataset.wired) return;
@@ -201,7 +228,7 @@ function wireNavigation(db) {
       document.querySelectorAll(".view").forEach((view) => view.classList.add("hidden"));
       $("#view-" + name)?.classList.remove("hidden");
       document.querySelectorAll(".nav").forEach((nav) => nav.classList.toggle("active", nav.dataset.view === name));
-      const titles = { overview:"Overview", devices:"Devices", policies:"Policies", applications:"Applications", compliance:"Compliance", activity:"Activity log" };
+      const titles = { overview:"Overview", devices:"Devices", policies:"Policies", applications:"Applications", compliance:"Compliance", users:"User management", staff:"Staff management", activity:"Activity log" };
       $("#page-title").textContent = titles[name] || "Overview";
     });
   });
