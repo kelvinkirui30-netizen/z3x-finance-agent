@@ -170,6 +170,10 @@ class FirebaseStatusRepository(
                         val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
                         val json = JSONObject(body.ifBlank { "{}" })
                         if (status in 200..299) {
+                            prefs.edit()
+                                .putBoolean("is_enrolled", true)
+                                .putString("owner_uid", current.uid)
+                                .apply()
                             Result.success(json.optString("message", "Device linked to your account."))
                         } else {
                             Result.failure(IllegalStateException(json.optString("error", "Device enrollment failed.")))
