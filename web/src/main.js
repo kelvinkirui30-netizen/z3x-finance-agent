@@ -1,0 +1,127 @@
+import { initializeApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
+import { getFirestore, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import "./styles.css";
+
+const env = import.meta.env;
+const config = {
+  apiKey: env.VITE_FIREBASE_API_KEY,
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: env.VITE_FIREBASE_APP_ID,
+};
+const missing = Object.entries(config).filter(([, value]) => !value).map(([key]) => key);
+const $ = (selector) => document.querySelector(selector);
+const authScreen = $("#auth-screen");
+const portal = $("#portal");
+const authMessage = $("#auth-message");
+
+if (missing.length) {
+  authMessage.textContent = "Website configuration is incomplete. Add the VITE_FIREBASE_* environment variables in Vercel.";
+  $("#google-signin").disabled = true;
+} else {
+  const app = initializeApp(config);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+
+  $("#google-signin").addEventListener("click", async () => {
+    authMessage.textContent = "Opening Google sign-in…";
+    try { await signInWithPopup(auth, provider); }
+    catch (error) { authMessage.textContent = friendlyError(error); }
+  });
+  $("#signout").addEventListener("click", () => signOut(auth));
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      portal.classList.add("hidden");
+      authScreen.classList.remove("hidden");
+      return;
+    }
+    try {
+      const token = await user.getIdTokenResult(true);
+      const role = token.claims.role;
+      if (!["super_admin", "admin", "assistant"].includes(role)) {
+        await signOut(auth);
+        authMessage.textContent = "This account is signed in but has no approved portal staff role. Ask the project owner to grant the correct role.";
+        return;
+      }
+      authScreen.classList.add("hidden");
+      portal.classList.remove("hidden");
+      $("#avatar").textContent = (user.displayName || user.email || "A").slice(0, 1).toUpperCase();
+      await loadDashboard(db);
+      wireNavigation(db);
+    } catch (error) {
+      await signOut(auth);
+      authMessage.textContent = friendlyError(error);
+    }
+  });
+}
+
+function friendlyError(error) {
+  if (error?.code === "auth/unauthorized-domain") return "Add this Vercel domain to Firebase Authentication → Settings → Authorized domains.";
+  if (error?.code === "auth/popup-closed-by-user") return "Sign-in was cancelled.";
+  return error?.message || "Unable to sign in. Please try again.";
+}
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[c]);
+}
+function date(value) {
+  if (!value) return "—";
+  const d = value?.toDate ? value.toDate() : new Date(value);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
+}
+function pill(value) {
+  const v = String(value || "unknown");
+  const cls = ["enrolled", "compliant"].includes(v) ? "good" : v === "pending" ? "pending" : "";
+  return '<span class="pill ' + cls + '">' + escapeHtml(v.replaceAll("_", " ")) + "</span>";
+}
+async function loadDashboard(db) {
+  try {
+    const [deviceSnap, policySnap, activitySnap] = await Promise.all([
+      getDocs(collection(db, "devices")),
+      getDocs(collection(db, "device_policies")),
+      getDocs(query(collection(db, "audit_logs"), orderBy("createdAt", "desc"), limit(8)))
+    ]);
+    const devices = deviceSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const policies = policySnap.docs.map((doc) => doc.data());
+    const activities = activitySnap.docs.map((doc) => doc.data());
+    $("#m-devices").textContent = devices.length;
+    $("#m-enrolled").textContent = devices.filter((d) => d.enrollmentStatus === "enrolled").length;
+    $("#m-compliant").textContent = devices.filter((d) => d.complianceStatus === "compliant").length;
+    $("#m-policies").textContent = policies.filter((p) => p.enabled !== false).length;
+    $("#nav-device-count").textContent = devices.length;
+    const deviceRows = devices.length ? devices.map((d) => '<tr><td><b>' + escapeHtml(d.displayName || d.deviceName || "Unnamed device") + '</b><span class="subline">' + escapeHtml([d.manufacturer, d.model].filter(Boolean).join(" ")) + '</span></td><td>' + escapeHtml(d.model || "—") + '</td><td>' + pill(d.enrollmentStatus) + '</td><td>' + (Number.isFinite(d.batteryLevel) ? escapeHtml(d.batteryLevel) + "%" : "—") + '</td><td>' + date(d.lastSeenAt) + "</td></tr>").join("") : '<tr><td colspan="5" class="empty">No device records are available to this account.</td></tr>';
+    $("#device-rows").innerHTML = deviceRows;
+    $("#compliance-rows").innerHTML = devices.length ? devices.map((d) => '<tr><td>' + escapeHtml(d.displayName || d.deviceName || "Unnamed device") + '</td><td>' + pill(d.enrollmentStatus) + '</td><td>' + pill(d.complianceStatus) + '</td><td>' + date(d.lastSeenAt) + '</td></tr>').join("") : '<tr><td colspan="4" class="empty">No device records available.</td></tr>';
+    const activityHtml = activities.length ? activities.map((a) => '<div class="activity-row"><b>' + escapeHtml(a.action || "Activity") + '</b><span class="subline">' + escapeHtml(a.actorEmail || "Administrator") + " · " + date(a.createdAt) + "</span></div>").join("") : "No activity recorded yet.";
+    $("#activity-preview").innerHTML = activityHtml;
+    $("#activity-full").innerHTML = activityHtml;
+    $("#policy-rows").textContent = policies.length ? policies.length + " policy record(s) found. Editing is not enabled in this release." : "No policy records available.";
+  } catch (error) {
+    showToast(error.code === "permission-denied" ? "Firestore denied access. Check staff custom claims and Firestore rules." : error.message);
+  }
+}
+function showToast(message) {
+  const el = $("#toast");
+  el.textContent = message;
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 3500);
+}
+function wireNavigation(db) {
+  document.querySelectorAll("[data-view], [data-go]").forEach((el) => {
+    if (el.dataset.wired) return;
+    el.dataset.wired = "1";
+    el.addEventListener("click", () => {
+      const name = el.dataset.view || el.dataset.go;
+      document.querySelectorAll(".view").forEach((view) => view.classList.add("hidden"));
+      $("#view-" + name)?.classList.remove("hidden");
+      document.querySelectorAll(".nav").forEach((nav) => nav.classList.toggle("active", nav.dataset.view === name));
+      const titles = { overview:"Overview", devices:"Devices", policies:"Policies", applications:"Applications", compliance:"Compliance", activity:"Activity log" };
+      $("#page-title").textContent = titles[name] || "Overview";
+    });
+  });
+  $("#refresh").onclick = () => loadDashboard(db);
+}
