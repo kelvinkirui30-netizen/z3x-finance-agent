@@ -62,6 +62,11 @@
             <article class="metric"><div class="metric-top"><span>My payments</span></div><strong id="my-payment-count">—</strong><small>Recorded payment entries</small></article>
             <article class="metric"><div class="metric-top"><span>Account role</span></div><strong id="my-role">User</strong><small>Personal account access</small></article>
           </div>
+          <div class="panel" style="margin-bottom:18px">
+            <div class="panel-head"><div><h3>Add a device</h3><p>Generate a single-use code, then enter it in Z3X Finance Agent on the device you are authorized to manage.</p></div></div>
+            <button class="btn primary" id="generate-enrollment-code" type="button">Generate enrollment code</button>
+            <div id="enrollment-code-result" class="empty" role="status" style="margin-top:12px">Codes expire after 10 minutes and can be used once.</div>
+          </div>
           <div class="content-grid">
             <article class="panel"><div class="panel-head"><div><h3>My devices</h3><p>Only devices linked to your account.</p></div></div><div id="my-device-list" class="empty">Loading your devices…</div></article>
             <article class="panel"><div class="panel-head"><div><h3>My finance records</h3><p>Your recorded schedules and payments.</p></div></div><div id="my-finance-list" class="empty">Loading your records…</div></article>
