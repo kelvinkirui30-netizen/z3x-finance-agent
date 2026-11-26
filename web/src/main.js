@@ -17,6 +17,8 @@ const $ = (selector) => document.querySelector(selector);
 const authScreen = $("#auth-screen");
 const portal = $("#portal");
 const authMessage = $("#auth-message");
+let signedInUser = null;
+let currentRole = "user";
 
 if (missing.length) {
   authMessage.textContent = "Website configuration is incomplete. Add the VITE_FIREBASE_* environment variables in Vercel.";
@@ -27,8 +29,6 @@ if (missing.length) {
   const db = getFirestore(app);
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
-  let signedInUser = null;
-  let currentRole = "user";
 
   $("#activate-super-admin").addEventListener("click", async () => {
     const secret = $("#bootstrap-secret").value;
