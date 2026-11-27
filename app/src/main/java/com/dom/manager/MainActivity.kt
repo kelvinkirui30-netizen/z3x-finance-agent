@@ -298,6 +298,12 @@ private fun DeviceDashboard(
                     InfoRow("Owner policy capability", if (status.managementCapabilities["canApplyOwnerPolicies"] == true) "Available" else "Not available")
                     InfoRow("Lock task permitted", if (status.managementCapabilities["lockTaskPermitted"] == true) "Yes" else "No")
                     InfoRow("Battery telemetry", if (status.managementCapabilities["batteryTelemetryAvailable"] == true) "Available" else "Unavailable")
+                    if (!status.isDeviceOwner && !status.isProfileOwner) {
+                        Text(
+                            "This phone currently has Standard or legacy Device Admin access. Device Owner access can only be assigned through supported Android Enterprise provisioning on an eligible new or factory-reset device; installing the app normally cannot grant it.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 } ?: Text("Reading local device status…")
             }
         }
