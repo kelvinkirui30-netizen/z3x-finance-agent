@@ -5,6 +5,8 @@ import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
 
@@ -13,6 +15,20 @@ object DeviceCheckInScheduler {
 
     fun cancel(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK_NAME)
+    }
+
+    fun checkInNow(context: Context) {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val request = OneTimeWorkRequestBuilder<DeviceCheckInWorker>()
+            .setConstraints(constraints)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "z3x-device-check-in-now",
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
     }
 
     fun schedule(context: Context) {

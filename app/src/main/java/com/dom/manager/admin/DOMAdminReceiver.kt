@@ -3,20 +3,20 @@ package com.dom.manager.admin
 import android.app.admin.DeviceAdminReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
+import com.dom.manager.remote.DeviceCheckInScheduler
 
+/**
+ * Observes the legacy Android Device Admin state only. No destructive
+ * device-admin policies are requested by this app.
+ */
 class DOMAdminReceiver : DeviceAdminReceiver() {
     override fun onEnabled(context: Context, intent: Intent) {
         super.onEnabled(context, intent)
-        Log.i(TAG, "Device administrator enabled")
+        DeviceCheckInScheduler.checkInNow(context.applicationContext)
     }
 
     override fun onDisabled(context: Context, intent: Intent) {
         super.onDisabled(context, intent)
-        Log.i(TAG, "Device administrator disabled")
-    }
-
-    companion object {
-        private const val TAG = "DOMAdminReceiver"
+        DeviceCheckInScheduler.checkInNow(context.applicationContext)
     }
 }

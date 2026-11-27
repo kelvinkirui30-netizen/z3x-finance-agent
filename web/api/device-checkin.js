@@ -81,6 +81,18 @@ export default async function handler(req, res) {
           createdAt: FieldValue.serverTimestamp()
         });
       }
+      const previousCapabilities = JSON.stringify(existing.managementCapabilities || {});
+      const reportedCapabilities = JSON.stringify(patch.managementCapabilities || {});
+      if (previousCapabilities !== reportedCapabilities) {
+        tx.create(db.collection("audit_logs").doc(), {
+          action: "device_management_capabilities_changed",
+          actorUid: user.uid,
+          targetDeviceId: installId,
+          previousValue: previousCapabilities,
+          newValue: reportedCapabilities,
+          createdAt: FieldValue.serverTimestamp()
+        });
+      }
     });
     return send(res, 200, { success: true, checkedInAt: new Date().toISOString() });
   } catch (error) {

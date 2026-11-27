@@ -67,7 +67,7 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 - [x] Add automated validation tests for code format/expiry/ownership, installation UUIDs, device payloads, management modes and enrollment state.\n- [ ] Add emulator-backed endpoint integration tests for expiry, replay, cross-account use, invalid payloads and concurrent transaction races.
 - [x] Add owner-authenticated device check-in API; it updates inventory only when the signed-in account matches the enrolled owner.
 - [x] Add network-constrained WorkManager check-ins (minimum 15-minute periodic interval) with retry on transient connectivity/server errors.
-- [x] Add owner-confirmed unlinking from the personal portal; preserve device history and append an audit event.\n- [x] Stop periodic check-ins after the server reports an unenrolled device.\n- [ ] Add enrollment-code revocation and explicit rebind tests.
+- [x] Add owner-confirmed unlinking from the personal portal; preserve device history and append an audit event.\n- [x] Stop periodic check-ins after the server reports an unenrolled device.\n- [x] Add enrollment-code revocation and explicit rebind tests.
 - [ ] Validate app enrollment, check-in and unlinking on a real test device and verify Vercel production functions are deployed.
 
 **Exit criteria:** core enrollment lifecycle is implemented and unit validation tests pass in CI; production acceptance remains pending until endpoint integration tests, deployed API and real-device verification pass.

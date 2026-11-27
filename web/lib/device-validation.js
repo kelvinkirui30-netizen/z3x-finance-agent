@@ -60,6 +60,17 @@ export function normalizeDevicePayload(input = {}) {
     CAPABILITY_KEYS.filter((key) => key in suppliedCapabilities)
       .map((key) => [key, suppliedCapabilities[key]])
   );
+  if (Object.keys(managementCapabilities).length > 0) {
+    const modeMatches =
+      (device.managementMode !== "device_owner" || managementCapabilities.deviceOwner === true) &&
+      (device.managementMode !== "profile_owner" || managementCapabilities.profileOwner === true) &&
+      (device.managementMode !== "device_admin" || managementCapabilities.legacyDeviceAdmin === true) &&
+      (device.managementMode !== "standard_access" ||
+        (managementCapabilities.deviceOwner !== true &&
+         managementCapabilities.profileOwner !== true &&
+         managementCapabilities.legacyDeviceAdmin !== true));
+    if (!modeMatches) return { ok: false, error: "Management mode does not match the reported Android capabilities." };
+  }
   return {
     ok: true,
     value: { ...device, sdkInt, batteryLevel, isCharging, managementCapabilities }
