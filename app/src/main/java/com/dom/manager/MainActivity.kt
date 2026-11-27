@@ -107,6 +107,23 @@ private fun AuthenticationScreen(
             if (busy) CircularProgressIndicator()
             else Text(if (createAccount) "Create account" else "Sign in")
         }
+        if (!createAccount) {
+            TextButton(
+                onClick = {
+                    message = null
+                    busy = true
+                    repository.sendPasswordReset(email) { result ->
+                        busy = false
+                        message = result.fold(
+                            onSuccess = { "If the account exists, a password reset email has been sent." },
+                            onFailure = { it.localizedMessage ?: "Unable to send the password reset email." }
+                        )
+                    }
+                },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Forgot password?") }
+        }
         TextButton(
             onClick = { createAccount = !createAccount; message = null },
             modifier = Modifier.fillMaxWidth()
@@ -195,6 +212,9 @@ private fun DeviceDashboard(
                         status.isDeviceAdmin -> "Device Admin"
                         else -> "Standard Access"
                     })
+                    InfoRow("Owner policy capability", if (status.managementCapabilities["canApplyOwnerPolicies"] == true) "Available" else "Not available")
+                    InfoRow("Lock task permitted", if (status.managementCapabilities["lockTaskPermitted"] == true) "Yes" else "No")
+                    InfoRow("Battery telemetry", if (status.managementCapabilities["batteryTelemetryAvailable"] == true) "Available" else "Unavailable")
                 } ?: Text("Reading local device status…")
             }
         }

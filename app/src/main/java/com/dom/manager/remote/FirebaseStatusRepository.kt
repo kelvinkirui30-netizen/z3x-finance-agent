@@ -51,8 +51,19 @@ class FirebaseStatusRepository(
             .addOnSuccessListener { result ->
                 val user = result.user
                 if (user == null) onResult(Result.failure(IllegalStateException("No user session returned.")))
-                else onResult(Result.success(user))
+                else ensureProfile(user, onResult)
             }
+            .addOnFailureListener { onResult(Result.failure(it)) }
+    }
+
+    fun sendPasswordReset(email: String, onResult: (Result<Unit>) -> Unit) {
+        val normalizedEmail = email.trim()
+        if (normalizedEmail.isBlank()) {
+            onResult(Result.failure(IllegalArgumentException("Enter your email address first.")))
+            return
+        }
+        auth.sendPasswordResetEmail(normalizedEmail)
+            .addOnSuccessListener { onResult(Result.success(Unit)) }
             .addOnFailureListener { onResult(Result.failure(it)) }
     }
 
@@ -149,6 +160,7 @@ class FirebaseStatusRepository(
                         put("sdkInt", snapshot.sdkInt)
                         put("appVersion", BuildConfig.VERSION_NAME)
                         put("managementMode", managementMode)
+                        put("managementCapabilities", JSONObject(snapshot.managementCapabilities))
                         snapshot.batteryLevel?.let { put("batteryLevel", it) }
                         snapshot.isCharging?.let { put("isCharging", it) }
                     })
