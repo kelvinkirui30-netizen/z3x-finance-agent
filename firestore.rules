@@ -74,19 +74,8 @@ service cloud.firestore {
     }
 
     match /device_commands/{commandId} {
-      allow read: if isStaff();
-      // The console may queue only non-destructive, user-visible requests.
-      allow create: if isAdmin()
-        && request.resource.data.keys().hasOnly([
-          "deviceId", "command", "payload", "status", "createdAt", "createdBy"
-        ])
-        && request.resource.data.command in [
-          "request_check_in", "refresh_policy", "display_notice"
-        ]
-        && request.resource.data.status == "pending"
-        && request.resource.data.deviceId is string
-        && request.resource.data.createdBy == request.auth.uid;
-      allow update, delete: if false;
+      // Commands are created, leased and acknowledged only by trusted server APIs.
+      allow read, write: if false;
     }
 
     match /device_installments/{installmentId} {

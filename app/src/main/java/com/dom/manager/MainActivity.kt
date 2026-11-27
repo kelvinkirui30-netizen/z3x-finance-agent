@@ -153,6 +153,11 @@ private fun DeviceDashboard(
     var enrollmentBusy by remember { mutableStateOf(false) }
     var enrollmentMessage by remember { mutableStateOf<String?>(null) }
     var confirmEnrollment by remember { mutableStateOf(false) }
+    var deviceNotice by remember {
+        mutableStateOf(
+            contextNotice(androidx.compose.ui.platform.LocalContext.current.applicationContext)
+        )
+    }
 
     DisposableEffect(userId) {
         val registration = repository.observeMyDevices(
@@ -194,6 +199,19 @@ private fun DeviceDashboard(
                     error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
                     devices.isEmpty() -> Text("No devices are registered to your account yet.")
                     else -> devices.forEach { DeviceCard(it) }
+                }
+            }
+        }
+        if (!deviceNotice.isNullOrBlank()) {
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Notice from your device administrator", style = MaterialTheme.typography.titleMedium)
+                    Text(deviceNotice.orEmpty())
+                    TextButton(onClick = {
+                        context.applicationContext.getSharedPreferences("z3x_device_identity", android.content.Context.MODE_PRIVATE)
+                            .edit().remove("last_device_notice").remove("last_device_notice_id").apply()
+                        deviceNotice = null
+                    }) { Text("Dismiss notice") }
                 }
             }
         }
@@ -301,6 +319,10 @@ private fun DeviceCard(device: ManagedDevice) {
         }
     }
 }
+
+private fun contextNotice(context: android.content.Context): String? =
+    context.getSharedPreferences("z3x_device_identity", android.content.Context.MODE_PRIVATE)
+        .getString("last_device_notice", null)
 
 @Composable
 private fun InfoRow(label: String, value: String) {

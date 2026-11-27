@@ -67,7 +67,7 @@ class DeviceCheckInWorker(
             }
             connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
             when (connection.responseCode) {
-                in 200..299 -> Result.success()
+                in 200..299 -> if (DeviceCommandProcessor.process(applicationContext, installId, token)) Result.success() else Result.retry()
                 401, 408, 429 -> Result.retry()
                 403, 404, 410 -> {
                     DeviceCheckInScheduler.cancel(applicationContext)
