@@ -36,3 +36,16 @@ for (const [name, path] of endpoints) {
     assert.equal(res.headers["X-Content-Type-Options"], "nosniff");
   });
 }
+
+test("admin dashboard handler imports and rejects non-GET requests", async () => {
+  const module = await import("../web/api/admin-dashboard.js");
+  assert.equal(typeof module.default, "function");
+  const req = { method: "POST", headers: {} };
+  const res = mockResponse();
+  await module.default(req, res);
+  assert.equal(res.statusCode, 405);
+  assert.deepEqual(res.body, { error: "Method not allowed." });
+  assert.equal(res.headers.Allow, "GET");
+  assert.equal(res.headers["Cache-Control"], "no-store");
+  assert.equal(res.headers["X-Content-Type-Options"], "nosniff");
+});
