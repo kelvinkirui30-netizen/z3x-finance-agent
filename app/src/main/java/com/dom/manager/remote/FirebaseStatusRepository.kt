@@ -11,7 +11,10 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
+import org.json.JSONArray
 import org.json.JSONObject
+import java.time.Instant
+import java.util.Date
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -47,11 +50,104 @@ data class FinancePayment(
     val reference: String
 )
 
+data class MyAccountData(
+    val devices: List<ManagedDevice>,
+    val installments: List<FinanceInstallment>,
+    val payments: List<FinancePayment>
+)
+
 class FirebaseStatusRepository(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
     fun currentUser(): FirebaseUser? = auth.currentUser
+
+    fun loadMyAccountData(onResult: (Result<MyAccountData>) -> Unit) {
+        val current = auth.currentUser
+        if (current == null) {
+            onResult(Result.failure(IllegalStateException("Sign in to load your account data.")))
+            return
+        }
+        current.getIdToken(false)
+            .addOnSuccessListener { tokenResult ->
+                val token = tokenResult.token
+                if (token.isNullOrBlank()) {
+                    onResult(Result.failure(IllegalStateException("Could not refresh your sign-in token.")))
+                    return@addOnSuccessListener
+                }
+                Thread {
+                    var connection: HttpURLConnection? = null
+                    val result = try {
+                        connection = (URL("https://z3x-finance-agent-rlq5.vercel.app/api/my-account-data").openConnection() as HttpURLConnection).apply {
+                            requestMethod = "GET"
+                            connectTimeout = 15000
+                            readTimeout = 20000
+                            setRequestProperty("Authorization", "Bearer $token")
+                        }
+                        val status = connection.responseCode
+                        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+                        val response = JSONObject(stream?.bufferedReader()?.use { it.readText() }.orEmpty().ifBlank { "{}" })
+                        if (status !in 200..299) {
+                            Result.failure(IllegalStateException(response.optString("error", "Unable to load account data.")))
+                        } else {
+                            fun timestamp(value: String?): Timestamp? = try {
+                                value?.takeIf { it.isNotBlank() && it != "null" }?.let {
+                                    Timestamp(Date.from(Instant.parse(it)))
+                                }
+                            } catch (_: Exception) { null }
+                            val devices = response.optJSONArray("devices").toObjects().map { item ->
+                                ManagedDevice(
+                                    id = item.optString("id"),
+                                    displayName = item.optString("displayName"),
+                                    manufacturer = item.optString("manufacturer"),
+                                    model = item.optString("model"),
+                                    androidVersion = item.optString("androidVersion"),
+                                    appVersion = item.optString("appVersion"),
+                                    managementMode = item.optString("managementMode"),
+                                    enrollmentStatus = item.optString("enrollmentStatus"),
+                                    batteryLevel = if (item.isNull("batteryLevel")) null else item.optLong("batteryLevel"),
+                                    isCharging = if (item.isNull("isCharging")) null else item.optBoolean("isCharging"),
+                                    lastSeenAt = timestamp(item.optString("lastSeenAt"))
+                                )
+                            }
+                            val installments = response.optJSONArray("installments").toObjects().map { item ->
+                                FinanceInstallment(
+                                    id = item.optString("id"),
+                                    deviceId = item.optString("deviceId"),
+                                    label = item.optString("label"),
+                                    amountMinor = item.optLong("amountMinor"),
+                                    currencyCode = item.optString("currencyCode", "KES"),
+                                    dueDate = timestamp(item.optString("dueDate"))
+                                )
+                            }
+                            val payments = response.optJSONArray("payments").toObjects().map { item ->
+                                FinancePayment(
+                                    id = item.optString("id"),
+                                    installmentId = item.optString("installmentId"),
+                                    amountMinor = item.optLong("amountMinor"),
+                                    currencyCode = item.optString("currencyCode", "KES"),
+                                    paidAt = timestamp(item.optString("paidAt")),
+                                    reference = item.optString("reference")
+                                )
+                            }
+                            Result.success(MyAccountData(devices, installments, payments))
+                        }
+                    } catch (error: Exception) {
+                        Result.failure(IllegalStateException(error.localizedMessage ?: "Network error while loading account data."))
+                    } finally {
+                        connection?.disconnect()
+                    }
+                    Handler(Looper.getMainLooper()).post { onResult(result) }
+                }.start()
+            }
+            .addOnFailureListener { onResult(Result.failure(it)) }
+    }
+
+    private fun JSONArray?.toObjects(): List<JSONObject> {
+        if (this == null) return emptyList()
+        return (0 until length()).mapNotNull { optJSONObject(it) }
+    }
+
 
     fun createAccount(name: String, email: String, password: String, onResult: (Result<FirebaseUser>) -> Unit) {
         auth.createUserWithEmailAndPassword(email.trim(), password)
@@ -310,7 +406,12 @@ class FirebaseStatusRepository(
                     Handler(Looper.getMainLooper()).post { onResult(result) }
                 }.start()
             }
-            .addOnFailureListener { onResult(Result.failure(it)) }
+            .addOnFailureListener {
+                // Firebase Authentication is the source of account identity.
+                // A profile document is optional for the Android agent and may
+                // be unavailable until production Firestore rules are deployed.
+                onResult(Result.success(user))
+            }
     }
 
     fun signOut() = auth.signOut()

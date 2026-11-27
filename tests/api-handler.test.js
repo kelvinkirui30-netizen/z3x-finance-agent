@@ -8,6 +8,7 @@ const endpoints = [
   ["unenroll device", "../web/api/unenroll-device.js"],
   ["revoke enrollment code", "../web/api/revoke-enrollment-code.js"],
   ["restore device enrollment", "../web/api/restore-device-enrollment.js"],
+  ["my account data", "../web/api/my-account-data.js"],
   ["create device command", "../web/api/create-device-command.js"],
   ["fetch device commands", "../web/api/fetch-device-commands.js"],
   ["complete device command", "../web/api/complete-device-command.js"]

@@ -154,6 +154,7 @@ private fun DeviceDashboard(
     var financeError by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
+    var refreshingAccount by remember { mutableStateOf(false) }
     var enrollmentCode by remember { mutableStateOf("") }
     var enrollmentBusy by remember { mutableStateOf(false) }
     var enrollmentMessage by remember { mutableStateOf<String?>(null) }
@@ -169,28 +170,25 @@ private fun DeviceDashboard(
         mutableStateOf(identityPrefs.getBoolean("is_enrolled", false) && identityPrefs.getString("owner_uid", null) == userId)
     }
 
-    DisposableEffect(userId) {
-        val registration = repository.observeMyDevices(
-            uid = userId,
-            onChange = { devices = it; loading = false; error = null },
-            onError = { loading = false; error = it.localizedMessage ?: "Unable to load devices." }
-        )
-        val installmentRegistration = repository.observeMyInstallments(
-            uid = userId,
-            onChange = { installments = it; financeError = null },
-            onError = { financeError = it.localizedMessage ?: "Unable to load your finance schedule." }
-        )
-        val paymentRegistration = repository.observeMyPayments(
-            uid = userId,
-            onChange = { payments = it; financeError = null },
-            onError = { financeError = it.localizedMessage ?: "Unable to load your payment history." }
-        )
-        onDispose {
-            registration.remove()
-            installmentRegistration.remove()
-            paymentRegistration.remove()
+    fun refreshAccountData() {
+        refreshingAccount = true
+        error = null
+        financeError = null
+        repository.loadMyAccountData { result ->
+            refreshingAccount = false
+            loading = false
+            result.onSuccess { data ->
+                devices = data.devices
+                installments = data.installments
+                payments = data.payments
+            }.onFailure {
+                error = it.localizedMessage ?: "Unable to load your account data."
+                financeError = error
+            }
         }
     }
+
+    LaunchedEffect(userId) { refreshAccountData() }
 
     DisposableEffect(context) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
@@ -238,7 +236,12 @@ private fun DeviceDashboard(
         }
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("My devices", style = MaterialTheme.typography.titleLarge)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("My devices", style = MaterialTheme.typography.titleLarge)
+                    TextButton(onClick = { refreshAccountData() }, enabled = !refreshingAccount) {
+                        Text(if (refreshingAccount) "Refreshing…" else "Refresh")
+                    }
+                }
                 Text("${devices.size} device(s) assigned to this account")
                 when {
                     loading -> CircularProgressIndicator()
