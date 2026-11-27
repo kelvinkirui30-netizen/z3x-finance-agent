@@ -6,6 +6,7 @@ import enrollDevice from "../web/api/enroll-device.js";
 import checkIn from "../web/api/device-checkin.js";
 import unenrollDevice from "../web/api/unenroll-device.js";
 import revokeCode from "../web/api/revoke-enrollment-code.js";
+import restoreEnrollment from "../web/api/restore-device-enrollment.js";
 
 const authHost = process.env.FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099";
 const apiKey = "fake-api-key";
@@ -83,11 +84,18 @@ test("enrollment lifecycle enforces ownership, one-time use, check-in and unlink
   const validCheckIn = await invoke(checkIn, owner.token, { installId, device: { ...device, batteryLevel: 66 } });
   assert.equal(validCheckIn.statusCode, 200);
 
+  const restored = await invoke(restoreEnrollment, owner.token, { installId });
+  assert.equal(restored.statusCode, 200);
+  const wrongAccountRestore = await invoke(restoreEnrollment, other.token, { installId });
+  assert.equal(wrongAccountRestore.statusCode, 403);
+
   const unlinked = await invoke(unenrollDevice, owner.token, { installId });
   assert.equal(unlinked.statusCode, 200);
 
   const stoppedCheckIn = await invoke(checkIn, owner.token, { installId, device });
   assert.equal(stoppedCheckIn.statusCode, 410);
+  const blockedRestore = await invoke(restoreEnrollment, owner.token, { installId });
+  assert.equal(blockedRestore.statusCode, 410);
 });
 
 test("enrollment codes can be revoked only by their owner and then cannot enroll", async () => {

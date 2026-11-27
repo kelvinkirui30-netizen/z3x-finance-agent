@@ -14,7 +14,6 @@ import com.google.firebase.firestore.SetOptions
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.UUID
 
 data class ManagedDevice(
     val id: String,
@@ -182,6 +181,57 @@ class FirebaseStatusRepository(
             }.sortedByDescending { it.paidAt?.toDate()?.time ?: 0L })
         }
 
+    fun restoreExistingEnrollment(
+        context: Context,
+        onResult: (Result<String>) -> Unit
+    ) {
+        val current = auth.currentUser
+        if (current == null) {
+            onResult(Result.failure(IllegalStateException("Sign in to restore this device link.")))
+            return
+        }
+        val installId = DeviceIdentity.getOrCreate(context)
+        current.getIdToken(false)
+            .addOnSuccessListener { tokenResult ->
+                val token = tokenResult.token
+                if (token.isNullOrBlank()) {
+                    onResult(Result.failure(IllegalStateException("Could not refresh your sign-in token.")))
+                    return@addOnSuccessListener
+                }
+                Thread {
+                    var connection: HttpURLConnection? = null
+                    val result = try {
+                        connection = (URL("https://z3x-finance-agent-rlq5.vercel.app/api/restore-device-enrollment").openConnection() as HttpURLConnection).apply {
+                            requestMethod = "POST"
+                            connectTimeout = 15000
+                            readTimeout = 20000
+                            doOutput = true
+                            setRequestProperty("Content-Type", "application/json")
+                            setRequestProperty("Authorization", "Bearer $token")
+                        }
+                        val body = JSONObject().put("installId", installId)
+                        connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+                        val status = connection.responseCode
+                        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+                        val response = JSONObject(stream?.bufferedReader()?.use { it.readText() }.orEmpty().ifBlank { "{}" })
+                        if (status in 200..299) {
+                            context.getSharedPreferences("z3x_device_identity", Context.MODE_PRIVATE)
+                                .edit().putBoolean("is_enrolled", true).putString("owner_uid", current.uid).apply()
+                            Result.success(response.optString("message", "Existing device link restored."))
+                        } else {
+                            Result.failure(IllegalStateException(response.optString("error", "No active device link was found.")))
+                        }
+                    } catch (error: Exception) {
+                        Result.failure(IllegalStateException(error.localizedMessage ?: "Unable to restore the device link."))
+                    } finally {
+                        connection?.disconnect()
+                    }
+                    Handler(Looper.getMainLooper()).post { onResult(result) }
+                }.start()
+            }
+            .addOnFailureListener { onResult(Result.failure(it)) }
+    }
+
     fun enrollCurrentDevice(
         context: Context,
         code: String,
@@ -205,9 +255,7 @@ class FirebaseStatusRepository(
                     return@addOnSuccessListener
                 }
                 val prefs = context.getSharedPreferences("z3x_device_identity", Context.MODE_PRIVATE)
-                val installId = prefs.getString("install_id", null) ?: UUID.randomUUID().toString().also {
-                    prefs.edit().putString("install_id", it).apply()
-                }
+                val installId = DeviceIdentity.getOrCreate(context)
                 val managementMode = when {
                     snapshot.isDeviceOwner -> "device_owner"
                     snapshot.isProfileOwner -> "profile_owner"

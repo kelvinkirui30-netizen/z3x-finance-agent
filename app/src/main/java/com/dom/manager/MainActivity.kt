@@ -165,6 +165,9 @@ private fun DeviceDashboard(
     }
     var lastCheckIn by remember { mutableLongStateOf(identityPrefs.getLong("last_checkin_at", 0L)) }
     var syncError by remember { mutableStateOf(identityPrefs.getString("last_checkin_error", null)) }
+    var isLinkedLocally by remember {
+        mutableStateOf(identityPrefs.getBoolean("is_enrolled", false) && identityPrefs.getString("owner_uid", null) == userId)
+    }
 
     DisposableEffect(userId) {
         val registration = repository.observeMyDevices(
@@ -195,6 +198,8 @@ private fun DeviceDashboard(
                 "last_device_notice" -> deviceNotice = prefs.getString("last_device_notice", null)
                 "last_checkin_at" -> lastCheckIn = prefs.getLong("last_checkin_at", 0L)
                 "last_checkin_error" -> syncError = prefs.getString("last_checkin_error", null)
+                "is_enrolled", "owner_uid" -> isLinkedLocally =
+                    prefs.getBoolean("is_enrolled", false) && prefs.getString("owner_uid", null) == userId
             }
         }
         identityPrefs.registerOnSharedPreferenceChangeListener(listener)
@@ -203,10 +208,20 @@ private fun DeviceDashboard(
     var localStatus by remember { mutableStateOf<com.dom.manager.device.DeviceSnapshot?>(null) }
     LaunchedEffect(userId) {
         val identityPrefs = context.applicationContext.getSharedPreferences("z3x_device_identity", android.content.Context.MODE_PRIVATE)
-        val enrolledForThisAccount = identityPrefs.getBoolean("is_enrolled", false) &&
-            identityPrefs.getString("owner_uid", null) == userId
-        if (enrolledForThisAccount) DeviceCheckInScheduler.schedule(context.applicationContext)
-        else DeviceCheckInScheduler.cancel(context.applicationContext)
+        if (isLinkedLocally) {
+            DeviceCheckInScheduler.schedule(context.applicationContext)
+        } else {
+            DeviceCheckInScheduler.cancel(context.applicationContext)
+            // Reinstallation does not unlink the server record. The same account
+            // can restore its link on the same Android installation identity.
+            repository.restoreExistingEnrollment(context.applicationContext) { result ->
+                if (result.isSuccess) {
+                    isLinkedLocally = true
+                    DeviceCheckInScheduler.schedule(context.applicationContext)
+                    DeviceCheckInScheduler.checkInNow(context.applicationContext)
+                }
+            }
+        }
         localStatus = DeviceStatusRepository(context.applicationContext).read()
     }
 
@@ -251,10 +266,8 @@ private fun DeviceDashboard(
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Agent health", style = MaterialTheme.typography.titleLarge)
-                val enrolledHere = identityPrefs.getBoolean("is_enrolled", false) &&
-                    identityPrefs.getString("owner_uid", null) == userId
-                InfoRow("Enrollment", if (enrolledHere) "Linked to this account" else "Not linked")
-                InfoRow("Background sync", if (enrolledHere) "Scheduled when Android permits" else "Not scheduled")
+                InfoRow("Enrollment", if (isLinkedLocally) "Linked to this account" else "Not linked")
+                InfoRow("Background sync", if (isLinkedLocally) "Scheduled when Android permits" else "Not scheduled")
                 InfoRow(
                     "Last successful sync",
                     if (lastCheckIn > 0L) java.text.DateFormat.getDateTimeInstance().format(java.util.Date(lastCheckIn)) else "Not yet recorded"
@@ -262,7 +275,7 @@ private fun DeviceDashboard(
                 syncError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 OutlinedButton(
                     onClick = { DeviceCheckInScheduler.checkInNow(context.applicationContext) },
-                    enabled = enrolledHere,
+                    enabled = isLinkedLocally,
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Sync now") }
             }
@@ -331,6 +344,7 @@ private fun DeviceDashboard(
                                 result.onSuccess {
                                     DeviceCheckInScheduler.schedule(context.applicationContext)
                                     DeviceCheckInScheduler.checkInNow(context.applicationContext)
+                                    isLinkedLocally = true
                                     enrollmentCode = ""
                                     enrollmentMessage = "Device successfully linked. Background check-ins are scheduled when Android permits."
                                 }.onFailure {
