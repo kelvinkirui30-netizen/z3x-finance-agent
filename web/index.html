@@ -59,7 +59,8 @@
       <footer class="landing-footer" id="security"><span>© 2026 Z3X FINANCE AGENT</span><span>Firebase-backed · Authorized access only</span></footer>
     </section>
     <div class="shell hidden" id="portal">
-      <aside class="sidebar">
+      <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+      <aside class="sidebar" id="portal-sidebar">
         <a class="brand" href="#"><span class="brand-mark">Z</span><span><b>Z3X</b><small>FINANCE AGENT</small></span></a>
         <div class="nav-label">WORKSPACE</div>
         <button class="nav active" data-view="overview"><span>▦</span> Overview</button>
@@ -76,17 +77,18 @@
 
       <main class="main">
         <header class="topbar">
-          <div><div class="eyebrow">DEVICE OPERATIONS / CONTROL CENTRE</div><h1 id="page-title">Overview</h1></div>
+          <div class="topbar-heading"><button class="menu-toggle" id="mobile-menu-toggle" type="button" aria-label="Open navigation menu" aria-expanded="false"><span></span><span></span><span></span></button><div><div class="eyebrow">DEVICE OPERATIONS / CONTROL CENTRE</div><h1 id="page-title">Overview</h1></div></div>
           <div class="top-actions"><span class="secure">● Secure Firebase session</span><span class="avatar" id="avatar">A</span><button class="btn secondary" id="signout">Sign out</button></div>
         </header>
 
         <section class="welcome">
-          <div><div class="eyebrow light">Z3X MANAGEMENT</div><h2>Device operations, clearly in view.</h2><p>Monitor enrolled devices and review recorded compliance information.</p></div>
+          <div><div class="eyebrow light">Z3X MANAGEMENT</div><h2>Device operations, clearly in view.</h2><p>Use the navigation to manage your account, enroll devices you own or are authorized to manage, and review available records.</p></div>
           <div class="welcome-symbol">Z3X</div>
         </section>
 
         <section id="view-user-home" class="view hidden">
           <div class="section-head"><div><h3>My account</h3><p>Your personal Z3X Finance Agent information.</p></div><button class="btn secondary" id="refresh-my-data">↻ Refresh</button></div>
+          <div id="my-data-warning" class="notice hidden" role="status"></div>
           <div class="metrics">
             <article class="metric"><div class="metric-top"><span>My devices</span></div><strong id="my-device-count">—</strong><small>Devices linked to your account</small></article>
             <article class="metric"><div class="metric-top"><span>My schedules</span></div><strong id="my-schedule-count">—</strong><small>Personal finance schedules</small></article>
@@ -120,6 +122,11 @@
 
         <section id="view-devices" class="view hidden">
           <div class="section-head"><div><h3>Device inventory</h3><p>Devices associated with authorized accounts.</p></div></div>
+          <div class="panel enrollment-panel">
+            <div class="panel-head"><div><h3>Add a device</h3><p>Generate a one-time enrollment code, then enter it in the Z3X Android app.</p></div></div>
+            <button class="btn primary" id="generate-enrollment-code" type="button">＋ Generate enrollment code</button>
+            <div id="enrollment-code-result" class="empty enrollment-result" role="status">Codes expire after 10 minutes and can be used once.</div>
+          </div>
           <div class="panel"><div class="table-wrap"><table><thead><tr><th>DEVICE</th><th>MODEL</th><th>ENROLLMENT</th><th>BATTERY</th><th>LAST SEEN</th></tr></thead><tbody id="device-rows"><tr><td colspan="5" class="empty">Loading device inventory…</td></tr></tbody></table></div></div>
         </section>
         <section id="view-policies" class="view hidden"><div class="section-head"><div><h3>Policy centre</h3><p>Review policy records. No policy changes are issued from this portal yet.</p></div></div><div class="panel"><div id="policy-rows" class="empty large">Loading policy records…</div></div></section>
