@@ -169,6 +169,14 @@ private fun DeviceDashboard(
     }
 
     val context = androidx.compose.ui.platform.LocalContext.current
+    DisposableEffect(context) {
+        val noticePrefs = context.applicationContext.getSharedPreferences("z3x_device_identity", android.content.Context.MODE_PRIVATE)
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+            if (key == "last_device_notice") deviceNotice = prefs.getString("last_device_notice", null)
+        }
+        noticePrefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { noticePrefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     var localStatus by remember { mutableStateOf<com.dom.manager.device.DeviceSnapshot?>(null) }
     LaunchedEffect(userId) {
         val identityPrefs = context.applicationContext.getSharedPreferences("z3x_device_identity", android.content.Context.MODE_PRIVATE)

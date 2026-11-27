@@ -6,7 +6,10 @@ const endpoints = [
   ["enroll device", "../web/api/enroll-device.js"],
   ["device check-in", "../web/api/device-checkin.js"],
   ["unenroll device", "../web/api/unenroll-device.js"],
-  ["revoke enrollment code", "../web/api/revoke-enrollment-code.js"]
+  ["revoke enrollment code", "../web/api/revoke-enrollment-code.js"],
+  ["create device command", "../web/api/create-device-command.js"],
+  ["fetch device commands", "../web/api/fetch-device-commands.js"],
+  ["complete device command", "../web/api/complete-device-command.js"]
 ];
 
 function mockResponse() {
@@ -48,14 +51,4 @@ test("admin dashboard handler imports and rejects non-GET requests", async () =>
   assert.equal(res.headers.Allow, "GET");
   assert.equal(res.headers["Cache-Control"], "no-store");
   assert.equal(res.headers["X-Content-Type-Options"], "nosniff");
-});
-
-test("device command endpoints reject unsupported HTTP methods", async () => {
-  const create = await invoke(createDeviceCommand, null, {}, "GET");
-  assert.equal(create.statusCode, 405);
-  assert.equal(create.headers.Allow, "POST");
-  const fetch = await invoke(fetchDeviceCommands, null, {}, "GET");
-  assert.equal(fetch.statusCode, 405);
-  const complete = await invoke(completeDeviceCommand, null, {}, "GET");
-  assert.equal(complete.statusCode, 405);
 });

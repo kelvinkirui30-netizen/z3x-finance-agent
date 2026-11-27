@@ -47,6 +47,7 @@ export default async function handler(req, res) {
         const data = commandSnap.data();
         const currentDevice = deviceSnap.data();
         if (currentDevice.ownerUid !== user.uid || currentDevice.enrollmentStatus !== "enrolled") return;
+        if (data.deviceId !== installId || data.ownerUid !== user.uid) return;
         if (!["request_check_in", "display_notice"].includes(data.command)) return;
         const expiry = data.expiresAt?.toMillis?.() || 0;
         if (expiry <= now) {
