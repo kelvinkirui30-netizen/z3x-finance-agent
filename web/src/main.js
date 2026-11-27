@@ -207,7 +207,7 @@ if (missing.length) {
         $("#refresh-my-data").onclick = () => loadPersonalDashboard(db, user);
         wireEnrollmentCode(user, db);
       } else {
-        await loadDashboard(db);
+        await loadDashboard();
         wireNavigation(db);
         wireAdminTools();
         wireEnrollmentCode(user, db);
@@ -248,16 +248,13 @@ function pill(value) {
   const cls = ["enrolled", "compliant"].includes(v) ? "good" : v === "pending" ? "pending" : "";
   return '<span class="pill ' + cls + '">' + escapeHtml(v.replaceAll("_", " ")) + "</span>";
 }
-async function loadDashboard(db) {
+async function loadDashboard() {
   try {
-    const [deviceSnap, policySnap, activitySnap] = await Promise.all([
-      getDocs(collection(db, "devices")),
-      getDocs(collection(db, "device_policies")),
-      getDocs(query(collection(db, "audit_logs"), orderBy("createdAt", "desc"), limit(8)))
-    ]);
-    const devices = deviceSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    const policies = policySnap.docs.map((doc) => doc.data());
-    const activities = activitySnap.docs.map((doc) => doc.data());
+    const token = await signedInUser.getIdToken();
+    const response = await fetch("/api/admin-dashboard", { headers: { Authorization: "Bearer " + token } });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Unable to load dashboard.");
+    const devices = result.devices || [], policies = result.policies || [], activities = result.activities || [];
     $("#m-devices").textContent = devices.length;
     $("#m-enrolled").textContent = devices.filter((d) => d.enrollmentStatus === "enrolled").length;
     $("#m-compliant").textContent = devices.filter((d) => d.complianceStatus === "compliant").length;
@@ -270,9 +267,7 @@ async function loadDashboard(db) {
     $("#activity-preview").innerHTML = activityHtml;
     $("#activity-full").innerHTML = activityHtml;
     $("#policy-rows").textContent = policies.length ? policies.length + " policy record(s) found. Editing is not enabled in this release." : "No policy records available.";
-  } catch (error) {
-    showToast(error.code === "permission-denied" ? "Firestore denied access. Check staff custom claims and Firestore rules." : error.message);
-  }
+  } catch (error) { showToast(error.message || "Unable to load dashboard data."); }
 }
 function showToast(message) {
   const el = $("#toast");
@@ -445,7 +440,7 @@ function wireNavigation(db) {
       closeMenu();
     });
   });
-  $("#refresh").onclick = () => loadDashboard(db);
+  $("#refresh").onclick = () => loadDashboard();
 }
 
 
