@@ -89,33 +89,35 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 ### Phase 4 — Android reliability and self-healing
 - Add a health model for app process/service status, last successful sync, scheduled work, permission state and policy/config version.
 - [x] Use Android-supported WorkManager jobs for network-constrained device check-ins and synchronization.
-- Use Android-supported WorkManager jobs for remaining deferrable health checks and synchronization.
-- Recover transient failures with bounded retries, backoff, idempotent operations and crash-safe local state.
-- Restore the app's own validated configuration from trusted server state; keep safe local defaults if offline.
-- On boot, schedule eligible work and refresh status when Android permits.
-- Detect app update, service interruption, revoked permissions, disabled admin status and changed management mode where observable.
-- Add a recovery screen with actionable instructions for actions only a user/admin can complete.
+- [x] Use Android-supported WorkManager for network-constrained periodic check-ins and immediate post-enrollment synchronization.
+- [x] Recover transient failures with WorkManager retry behavior and clear local enrollment state when the server authoritatively rejects ownership/enrollment.
+- [ ] Restore the app's own validated configuration from trusted server state; keep safe local defaults if offline.
+- [x] On boot and app replacement, restore eligible check-in work only when the same enrolled account is signed in.
+- [x] Detect observable management-mode, app-version and capability changes and record minimal audit events.
+- [x] Recheck state after legacy Device Admin enable/disable callbacks.
+- [ ] Add a dedicated recovery screen with actionable instructions for actions only a user/admin can complete.
 - Do not promise recovery after uninstall, factory reset, OS restriction or loss of required privileges.
 
 **Exit criteria:** tests demonstrate recovery from process death, reboot, temporary network loss and corrupted local cache without bypassing Android protections.
 
 ### Phase 5 — Tamper and integrity monitoring
-- Define observable events: permission/admin-state changes, management-mode changes, app version mismatch, configuration drift, repeated failed authentication and device credential revocation.
-- Sign device reports or use short-lived server-issued credentials; validate all reports server-side.
-- Keep event data minimal and avoid collecting unrelated personal content.
-- Queue events offline and upload securely when connectivity returns.
-- Alert authorized staff and show a clear device-side status notice.
+- [x] Record management-mode, agent-version and capability changes during authenticated check-in as audit events.
+- [x] Validate capability keys/types and reject contradictory management-mode reports.
+- [ ] Add signed device reports or short-lived server-issued credentials for stronger device attestation; current capability reports remain device-reported telemetry, not cryptographic proof.
+- [x] Keep event data minimal and avoid collecting unrelated personal content.
+- [ ] Add a dedicated staff integrity-alert view and offline event batching.
 - Distinguish confirmed events from signals that are only suspicious.
 
 **Exit criteria:** tamper events are auditable, rate-limited, privacy-minimized and accurately classified.
 
 ### Phase 6 — Secure command and policy framework
-- Establish a typed command schema, per-device targeting, unique IDs, issue/expiry timestamps, nonce/replay protection, status lifecycle and result reporting.
-- Use server-authorized command signing/verification with key rotation and no embedded server secret in the APK.
-- Start with safe operations: request check-in, refresh policy, display notice and open recovery guidance.
-- Require explicit policy authorization, device capability checks and clear user visibility for any future device restrictions.
-- Do not permit finance events to generate device-control commands.
-- Provide expiry, cancellation, duplicate rejection, offline behavior and command audit trails.
+- [x] Establish a typed server command allowlist, per-device targeting, unique IDs, expiry, delivery lease, one-time nonce verification, status lifecycle and result reporting.
+- [x] Use trusted Firebase Admin server APIs and authenticated HTTPS; no server secret is embedded in the APK. Stronger asymmetric device attestation remains pending.
+- [x] Implement safe operations: request check-in and display a visible notice in the app.
+- [ ] Add open-recovery-guidance command and staff command review/cancellation UI.
+- [x] Restrict command issuance to Admin/Super Admin and verify the enrolled device owner at delivery and acknowledgement.
+- [x] Do not permit finance events to generate device-control commands.
+- [x] Expire commands, reject replayed/wrong-device acknowledgements, and append command issuance/result audit events.
 
 **Exit criteria:** invalid, expired, replayed, wrong-device and unauthorized commands are rejected; supported commands produce verifiable results.
 

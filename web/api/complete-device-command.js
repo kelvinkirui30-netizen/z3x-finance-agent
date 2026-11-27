@@ -39,7 +39,8 @@ export default async function handler(req, res) {
       if (!commandSnap.exists || !deviceSnap.exists) throw Object.assign(new Error("Command or device not found."), { status: 404 });
       const command = commandSnap.data();
       const device = deviceSnap.data();
-      if (device.ownerUid !== user.uid || command.deviceId !== installId || command.ownerUid !== user.uid) {
+      if (device.ownerUid !== user.uid || device.enrollmentStatus !== "enrolled" ||
+          command.deviceId !== installId || command.ownerUid !== user.uid) {
         throw Object.assign(new Error("This command does not belong to the signed-in account."), { status: 403 });
       }
       if (command.status !== "delivered") throw Object.assign(new Error("This command is no longer awaiting a result."), { status: 409 });

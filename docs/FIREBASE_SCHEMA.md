@@ -67,7 +67,7 @@ Optional location history. Only implement when the device user has been clearly 
 ## Security model
 
 - Browser and Android apps use Firebase client SDKs and Firebase Authentication.
-- Device enrollment and check-in are mediated by a trusted HTTPS server endpoint. The Android app never receives a Firebase Admin key.
+- Device enrollment, check-in and command delivery are mediated by trusted HTTPS server endpoints. The Android app never receives a Firebase Admin key.
 - Firestore rules deny direct client writes to device identity/status, enrollment codes, device check-ins, command delivery results, audit logs and location history.
 - Admin access uses verified custom claims. A trusted Admin SDK process is required to set claims.
 - The initial command allowlist excludes destructive device operations. Finance records never automatically cause device restrictions.

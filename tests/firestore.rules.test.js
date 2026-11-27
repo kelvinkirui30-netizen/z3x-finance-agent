@@ -78,16 +78,13 @@ test("Assistant cannot queue privileged device commands", async () => {
   }));
 });
 
-test("Admin can queue only the explicitly allowed safe command shape", async () => {
+test("device commands can only be created, read and acknowledged through trusted server APIs", async () => {
   const db = user("admin-a", "admin");
-  await assertSucceeds(setDoc(doc(db, "device_commands/admin-command"), {
-    deviceId: "device-a", command: "display_notice", payload: {}, status: "pending",
-    createdAt: new Date(), createdBy: "admin-a"
+  await assertFails(setDoc(doc(db, "device_commands/admin-command"), {
+    deviceId: "device-a", command: "display_notice", payload: { message: "Please open the app." },
+    status: "pending", createdAt: new Date(), createdBy: "admin-a"
   }));
-  await assertFails(setDoc(doc(db, "device_commands/unsafe-command"), {
-    deviceId: "device-a", command: "factory_reset", payload: {}, status: "pending",
-    createdAt: new Date(), createdBy: "admin-a"
-  }));
+  await assertFails(getDoc(doc(db, "device_commands/admin-command")));
 });
 
 test("users cannot grant themselves a staff role through their profile", async () => {

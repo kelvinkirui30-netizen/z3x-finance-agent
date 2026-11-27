@@ -33,7 +33,12 @@ export default async function handler(req, res) {
     if (!device.exists || device.data().ownerUid !== user.uid) return send(res, 403, { error: "This device is not linked to the signed-in account." });
     if (device.data().enrollmentStatus !== "enrolled") return send(res, 410, { error: "This device is no longer enrolled." });
 
-    const candidates = await db.collection("device_commands").where("deviceId", "==", installId).limit(50).get();
+    const candidates = await db.collection("device_commands")
+      .where("deviceId", "==", installId)
+      .where("status", "in", ["pending", "delivered"])
+      .orderBy("createdAt", "asc")
+      .limit(50)
+      .get();
     const commands = [];
     const now = Date.now();
     for (const candidate of candidates.docs) {
