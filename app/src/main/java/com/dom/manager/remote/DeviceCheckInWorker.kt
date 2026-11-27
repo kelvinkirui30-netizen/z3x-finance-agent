@@ -66,8 +66,16 @@ class DeviceCheckInWorker(
             when (connection.responseCode) {
                 in 200..299 -> Result.success()
                 401, 408, 429 -> Result.retry()
-                404, 410 -> {
+                403, 404, 410 -> {
+                    // The server is authoritative: this installation is no longer
+                    // associated with the signed-in account or is no longer enrolled.
+                    // Stop background work and clear only the local enrollment flag;
+                    // retain the installation ID so the user can explicitly re-enroll.
                     DeviceCheckInScheduler.cancel(applicationContext)
+                    prefs.edit()
+                        .putBoolean("is_enrolled", false)
+                        .remove("owner_uid")
+                        .apply()
                     Result.success()
                 }
                 in 500..599 -> Result.retry()
