@@ -15,6 +15,14 @@ function services() {
   const app = getApps()[0] || initializeApp({ credential: cert(account), projectId: PROJECT_ID });
   return { auth: getAuth(app), db: getFirestore(app) };
 }
+function serialize(value) {
+  if (value && typeof value.toDate === "function") return value.toDate().toISOString();
+  if (Array.isArray(value)) return value.map(serialize);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, serialize(item)]));
+  }
+  return value;
+}
 export default async function handler(req, res) {
   if (req.method !== "GET") { res.setHeader("Allow", "GET"); return send(res, 405, { error: "Method not allowed." }); }
   try {
@@ -31,9 +39,9 @@ export default async function handler(req, res) {
     ]);
     return send(res, 200, {
       role,
-      devices: devices.docs.map((d) => ({ id: d.id, ...d.data() })),
-      policies: policies.docs.map((d) => ({ id: d.id, ...d.data() })),
-      activities: activity.docs.map((d) => ({ id: d.id, ...d.data() }))
+      devices: devices.docs.map((d) => serialize({ id: d.id, ...d.data() })),
+      policies: policies.docs.map((d) => serialize({ id: d.id, ...d.data() })),
+      activities: activity.docs.map((d) => serialize({ id: d.id, ...d.data() }))
     });
   } catch (error) {
     console.error("Admin dashboard API failed:", error?.message || "Unknown error");
