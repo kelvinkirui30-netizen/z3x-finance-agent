@@ -260,6 +260,7 @@ private fun DeviceDashboard(
                                 enrollmentBusy = false
                                 result.onSuccess {
                                     DeviceCheckInScheduler.schedule(context.applicationContext)
+                                    DeviceCheckInScheduler.checkInNow(context.applicationContext)
                                     enrollmentCode = ""
                                     enrollmentMessage = "Device successfully linked. Background check-ins are scheduled when Android permits."
                                 }.onFailure {

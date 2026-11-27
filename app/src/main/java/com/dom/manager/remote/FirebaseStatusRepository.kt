@@ -51,7 +51,7 @@ class FirebaseStatusRepository(
             .addOnSuccessListener { result ->
                 val user = result.user
                 if (user == null) onResult(Result.failure(IllegalStateException("No user session returned.")))
-                else ensureProfile(user, onResult)
+                else onResult(Result.success(user))
             }
             .addOnFailureListener { onResult(Result.failure(it)) }
     }

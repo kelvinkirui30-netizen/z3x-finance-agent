@@ -55,9 +55,14 @@ test("rejects missing, oversized, and unsupported device fields", () => {
   assert.equal(normalizeDevicePayload({ ...validDevice, managementMode: "root_override" }).ok, false);
 });
 
-test("rejects malformed or unrecognized capability flags", () => {
+test("rejects malformed, unrecognized, or contradictory capability flags", () => {
   assert.equal(normalizeDevicePayload({ ...validDevice, managementCapabilities: { deviceOwner: "yes" } }).ok, false);
   assert.equal(normalizeDevicePayload({ ...validDevice, managementCapabilities: { wipeDevice: true } }).ok, false);
+  assert.equal(normalizeDevicePayload({
+    ...validDevice,
+    managementMode: "device_owner",
+    managementCapabilities: { ...validDevice.managementCapabilities, deviceOwner: false }
+  }).ok, false);
 });
 
 test("rejects invalid Android, battery, and charging values", () => {
