@@ -19,4 +19,11 @@ class DOMAdminReceiver : DeviceAdminReceiver() {
         super.onDisabled(context, intent)
         DeviceCheckInScheduler.checkInNow(context.applicationContext)
     }
+
+    override fun onProfileProvisioningComplete(context: Context, intent: Intent) {
+        super.onProfileProvisioningComplete(context, intent)
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        launchIntent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (launchIntent != null) context.startActivity(launchIntent)
+    }
 }

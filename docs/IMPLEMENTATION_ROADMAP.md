@@ -19,6 +19,7 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 - Report actual management mode and capabilities. Never label Standard Access as Device Owner.
 - Self-healing means recovery of the app's own supported services, configuration and scheduled work. It must not secretly reinstall the app, bypass Android security, conceal itself, or defeat a device owner's control.
 - Device Owner-only capabilities are enabled only after supported Android provisioning and a runtime capability check.
+- Fully managed provisioning requires a device that Android permits to be provisioned (typically new or factory-reset); setup is explicit and can fail/reset the device if system prerequisites are not met.
 - No finance event may automatically trigger a device restriction. Finance records are separate from device-management authorization.
 - Commands are authenticated, scoped to one enrolled device, short-lived, replay-resistant, audited and visible to the authorized device user. Provide a safe recovery path.
 - No remote wipe, covert tracking, credential extraction, hidden persistence, or security-control bypass.
