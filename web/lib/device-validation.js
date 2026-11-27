@@ -7,6 +7,14 @@ export const MANAGEMENT_MODES = new Set([
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CODE_PATTERN = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/;
+const CAPABILITY_KEYS = [
+  "deviceOwner",
+  "profileOwner",
+  "legacyDeviceAdmin",
+  "canApplyOwnerPolicies",
+  "lockTaskPermitted",
+  "batteryTelemetryAvailable"
+];
 
 export function isValidInstallId(value) {
   return typeof value === "string" && UUID_PATTERN.test(value);
@@ -41,9 +49,20 @@ export function normalizeDevicePayload(input = {}) {
   if (isCharging !== null && typeof isCharging !== "boolean") {
     return { ok: false, error: "Invalid charging state." };
   }
+  const suppliedCapabilities = input.managementCapabilities ?? {};
+  if (!suppliedCapabilities || typeof suppliedCapabilities !== "object" ||
+      Array.isArray(suppliedCapabilities) ||
+      Object.keys(suppliedCapabilities).some((key) => !CAPABILITY_KEYS.includes(key)) ||
+      Object.values(suppliedCapabilities).some((value) => typeof value !== "boolean")) {
+    return { ok: false, error: "Invalid management capability report." };
+  }
+  const managementCapabilities = Object.fromEntries(
+    CAPABILITY_KEYS.filter((key) => key in suppliedCapabilities)
+      .map((key) => [key, suppliedCapabilities[key]])
+  );
   return {
     ok: true,
-    value: { ...device, sdkInt, batteryLevel, isCharging }
+    value: { ...device, sdkInt, batteryLevel, isCharging, managementCapabilities }
   };
 }
 

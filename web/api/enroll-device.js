@@ -42,8 +42,8 @@ export default async function handler(req, res) {
     if (!isValidInstallId(installId)) return send(res, 400, { error: "Invalid app installation identifier." });
     const normalized = normalizeDevicePayload(body.device);
     if (!normalized.ok) return send(res, 400, { error: normalized.error });
-    const { manufacturer, model, androidVersion, appVersion, managementMode, sdkInt, batteryLevel, isCharging } = normalized.value;
-    const device = { manufacturer, model, androidVersion, appVersion, managementMode };
+    const { manufacturer, model, androidVersion, appVersion, managementMode, sdkInt, batteryLevel, isCharging, managementCapabilities } = normalized.value;
+    const device = { manufacturer, model, androidVersion, appVersion, managementMode, managementCapabilities };
     const codeHash = createHash("sha256").update(code).digest("hex");
     const codeRef = db.collection("enrollment_codes").doc(codeHash);
     const deviceRef = db.collection("devices").doc(installId);

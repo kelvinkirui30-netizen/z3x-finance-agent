@@ -46,10 +46,11 @@ export default async function handler(req, res) {
       if (!snap.exists) {
         throw Object.assign(new Error("This installation is not enrolled. Generate a new code in your portal."), { status: 404 });
       }
-      if (!isDeviceOwnedBy(snap.data(), user.uid)) {
+      const existing = snap.data();
+      if (!isDeviceOwnedBy(existing, user.uid)) {
         throw Object.assign(new Error("This device is not linked to the signed-in account."), { status: 403 });
       }
-      if (!isDeviceEnrolled(snap.data())) {
+      if (!isDeviceEnrolled(existing)) {
         throw Object.assign(new Error("This device is no longer enrolled. Link it again from your portal if you want to resume check-ins."), { status: 410 });
       }
       tx.update(ref, {
@@ -60,6 +61,26 @@ export default async function handler(req, res) {
         lastSeenAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp()
       });
+      if (existing.managementMode !== patch.managementMode) {
+        tx.create(db.collection("audit_logs").doc(), {
+          action: "device_management_mode_changed",
+          actorUid: user.uid,
+          targetDeviceId: installId,
+          previousValue: existing.managementMode || "unknown",
+          newValue: patch.managementMode,
+          createdAt: FieldValue.serverTimestamp()
+        });
+      }
+      if (existing.appVersion !== patch.appVersion) {
+        tx.create(db.collection("audit_logs").doc(), {
+          action: "device_agent_version_changed",
+          actorUid: user.uid,
+          targetDeviceId: installId,
+          previousValue: existing.appVersion || "unknown",
+          newValue: patch.appVersion,
+          createdAt: FieldValue.serverTimestamp()
+        });
+      }
     });
     return send(res, 200, { success: true, checkedInAt: new Date().toISOString() });
   } catch (error) {

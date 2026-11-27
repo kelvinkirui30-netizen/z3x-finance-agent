@@ -20,6 +20,8 @@ class DeviceCheckInWorker(
         val user = FirebaseAuth.getInstance().currentUser ?: return Result.success()
         val prefs = applicationContext.getSharedPreferences("z3x_device_identity", Context.MODE_PRIVATE)
         val installId = prefs.getString("install_id", null) ?: return Result.success()
+        if (!prefs.getBoolean("is_enrolled", false) ||
+            prefs.getString("owner_uid", null) != user.uid) return Result.success()
 
         val token = try {
             Tasks.await(user.getIdToken(true)).token ?: return Result.retry()
@@ -47,6 +49,7 @@ class DeviceCheckInWorker(
                 put("sdkInt", snapshot.sdkInt)
                 put("appVersion", BuildConfig.VERSION_NAME)
                 put("managementMode", managementMode)
+                put("managementCapabilities", JSONObject(snapshot.managementCapabilities))
                 snapshot.batteryLevel?.let { put("batteryLevel", it) }
                 snapshot.isCharging?.let { put("isCharging", it) }
             })
@@ -67,15 +70,8 @@ class DeviceCheckInWorker(
                 in 200..299 -> Result.success()
                 401, 408, 429 -> Result.retry()
                 403, 404, 410 -> {
-                    // The server is authoritative: this installation is no longer
-                    // associated with the signed-in account or is no longer enrolled.
-                    // Stop background work and clear only the local enrollment flag;
-                    // retain the installation ID so the user can explicitly re-enroll.
                     DeviceCheckInScheduler.cancel(applicationContext)
-                    prefs.edit()
-                        .putBoolean("is_enrolled", false)
-                        .remove("owner_uid")
-                        .apply()
+                    prefs.edit().putBoolean("is_enrolled", false).remove("owner_uid").apply()
                     Result.success()
                 }
                 in 500..599 -> Result.retry()

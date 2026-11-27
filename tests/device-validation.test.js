@@ -17,7 +17,15 @@ const validDevice = {
   managementMode: "standard_access",
   sdkInt: 34,
   batteryLevel: 72,
-  isCharging: false
+  isCharging: false,
+  managementCapabilities: {
+    deviceOwner: false,
+    profileOwner: false,
+    legacyDeviceAdmin: false,
+    canApplyOwnerPolicies: false,
+    lockTaskPermitted: false,
+    batteryTelemetryAvailable: true
+  }
 };
 
 test("accepts a standard UUID installation identifier and rejects malformed values", () => {
@@ -33,7 +41,7 @@ test("accepts only eight-character enrollment codes from the configured alphabet
   assert.equal(isValidEnrollmentCode("SHORT"), false);
 });
 
-test("normalizes a valid device report without collecting persistent hardware identifiers", () => {
+test("normalizes device capability reports without collecting persistent hardware identifiers", () => {
   const result = normalizeDevicePayload(validDevice);
   assert.equal(result.ok, true);
   assert.deepEqual(result.value, validDevice);
@@ -45,6 +53,11 @@ test("rejects missing, oversized, and unsupported device fields", () => {
   assert.equal(normalizeDevicePayload({ ...validDevice, model: "" }).ok, false);
   assert.equal(normalizeDevicePayload({ ...validDevice, manufacturer: "x".repeat(121) }).ok, false);
   assert.equal(normalizeDevicePayload({ ...validDevice, managementMode: "root_override" }).ok, false);
+});
+
+test("rejects malformed or unrecognized capability flags", () => {
+  assert.equal(normalizeDevicePayload({ ...validDevice, managementCapabilities: { deviceOwner: "yes" } }).ok, false);
+  assert.equal(normalizeDevicePayload({ ...validDevice, managementCapabilities: { wipeDevice: true } }).ok, false);
 });
 
 test("rejects invalid Android, battery, and charging values", () => {
