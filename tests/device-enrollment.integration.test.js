@@ -7,6 +7,7 @@ import checkIn from "../web/api/device-checkin.js";
 import unenrollDevice from "../web/api/unenroll-device.js";
 import revokeCode from "../web/api/revoke-enrollment-code.js";
 import restoreEnrollment from "../web/api/restore-device-enrollment.js";
+import myAccountData from "../web/api/my-account-data.js";
 
 const authHost = process.env.FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099";
 const apiKey = "fake-api-key";
@@ -83,6 +84,13 @@ test("enrollment lifecycle enforces ownership, one-time use, check-in and unlink
 
   const validCheckIn = await invoke(checkIn, owner.token, { installId, device: { ...device, batteryLevel: 66 } });
   assert.equal(validCheckIn.statusCode, 200);
+
+  const accountData = await invoke(myAccountData, owner.token, {}, "GET");
+  assert.equal(accountData.statusCode, 200);
+  assert.equal(accountData.body.devices.some((item) => item.id === installId), true);
+  const otherAccountData = await invoke(myAccountData, other.token, {}, "GET");
+  assert.equal(otherAccountData.statusCode, 200);
+  assert.equal(otherAccountData.body.devices.some((item) => item.id === installId), false);
 
   const restored = await invoke(restoreEnrollment, owner.token, { installId });
   assert.equal(restored.statusCode, 200);

@@ -8,7 +8,7 @@ const endpoints = [
   ["unenroll device", "../web/api/unenroll-device.js"],
   ["revoke enrollment code", "../web/api/revoke-enrollment-code.js"],
   ["restore device enrollment", "../web/api/restore-device-enrollment.js"],
-  ["my account data", "../web/api/my-account-data.js"],
+  ["my account data", "../web/api/my-account-data.js", "GET"],
   ["create device command", "../web/api/create-device-command.js"],
   ["fetch device commands", "../web/api/fetch-device-commands.js"],
   ["complete device command", "../web/api/complete-device-command.js"]
@@ -25,18 +25,18 @@ function mockResponse() {
   };
 }
 
-for (const [name, path] of endpoints) {
-  test(`${name} handler imports and rejects non-POST requests`, async () => {
+for (const [name, path, allowedMethod = "POST"] of endpoints) {
+  test(`${name} handler imports and rejects unsupported methods`, async () => {
     const module = await import(path);
     assert.equal(typeof module.default, "function");
 
-    const req = { method: "GET", headers: {} };
+    const req = { method: allowedMethod === "GET" ? "POST" : "GET", headers: {} };
     const res = mockResponse();
     await module.default(req, res);
 
     assert.equal(res.statusCode, 405);
     assert.deepEqual(res.body, { error: "Method not allowed." });
-    assert.equal(res.headers.Allow, "POST");
+    assert.equal(res.headers.Allow, allowedMethod);
     assert.equal(res.headers["Cache-Control"], "no-store");
     assert.equal(res.headers["X-Content-Type-Options"], "nosniff");
   });
