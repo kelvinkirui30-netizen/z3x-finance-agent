@@ -9,38 +9,55 @@
 </head>
 <body>
   <div id="app">
-    <section class="auth-shell" id="auth-screen">
-      <div class="auth-card">
-        <div class="brand-mark">Z</div>
-        <p class="eyebrow">Z3X FINANCE AGENT</p>
-        <h1>Management Portal</h1>
-        <p class="muted">Sign in or create an account with your email address, or continue with Google.</p>
-        <form id="email-auth-form" class="email-auth-form">
-          <label for="auth-email">Email address</label>
-          <input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com" />
-          <label for="auth-password">Password</label>
-          <input id="auth-password" type="password" autocomplete="current-password" minlength="8" required placeholder="At least 8 characters" />
-          <button class="btn primary full-width" id="email-submit" type="submit">Sign in with email</button>
-        </form>
-        <div class="auth-links">
-          <button class="text-btn" id="auth-mode-toggle" type="button">Create an account</button>
-          <button class="text-btn" id="forgot-password" type="button">Forgot password?</button>
+    <section class="landing" id="auth-screen">
+      <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div><div class="grid-glow"></div>
+      <header class="landing-nav">
+        <a class="landing-brand" href="#" aria-label="Z3X Finance Agent home"><span class="brand-mark">Z</span><span><b>Z3X</b><small>FINANCE AGENT</small></span></a>
+        <nav class="landing-links" aria-label="Main navigation"><a href="#platform">Platform</a><a href="#how-it-works">How it works</a><a href="#security">Security</a></nav>
+        <a class="nav-cta" href="#auth-panel">Sign in <span>↗</span></a>
+      </header>
+      <main class="landing-main">
+        <section class="hero-copy">
+          <div class="hero-pill"><span class="pulse-dot"></span> DEVICE OPERATIONS, MADE CLEAR</div>
+          <h1>One clear view.<br/><span>Smarter device</span><br/>management.</h1>
+          <p class="hero-lead">A central workspace for authorized device enrollment, account oversight and finance records — connected through Firebase.</p>
+          <div class="hero-actions"><a class="hero-primary" href="#auth-panel">Open management portal <span>→</span></a><a class="hero-secondary" href="#platform">Explore platform <span>↓</span></a></div>
+          <div class="hero-proof"><div class="proof-avatars"><i>Z</i><i>✓</i><i>↗</i></div><p><b>Built for accountable operations</b><small>Clear access. Recorded activity. Owner-controlled devices.</small></p></div>
+          <div class="hero-orbit" aria-hidden="true"><div class="orbit-ring ring-a"></div><div class="orbit-ring ring-b"></div><div class="orbit-core">Z<span>3X</span></div><div class="orbit-chip chip-a">✓ <span>Verified access</span></div><div class="orbit-chip chip-b">⌁ <span>Live check-ins</span></div><div class="orbit-chip chip-c">◈ <span>One workspace</span></div></div>
+        </section>
+        <aside class="auth-card" id="auth-panel">
+          <div class="auth-card-top"><span class="auth-card-icon">Z</span><span class="secure-label"><i></i> SECURE SIGN IN</span></div>
+          <p class="eyebrow">WELCOME TO Z3X</p>
+          <h2 id="auth-heading">Sign in to your workspace</h2>
+          <p class="auth-intro">Use your email and password, or continue with Google.</p>
+          <form id="email-auth-form" class="email-auth-form">
+            <label for="auth-email">Email address</label>
+            <input id="auth-email" type="email" autocomplete="email" required placeholder="name@example.com" />
+            <div class="password-label"><label for="auth-password">Password</label><span class="password-hint">8+ characters</span></div>
+            <input id="auth-password" type="password" autocomplete="current-password" minlength="8" required placeholder="Enter your password" />
+            <button class="btn primary full-width" id="email-submit" type="submit">Sign in with email <span>→</span></button>
+          </form>
+          <div class="auth-links"><button class="text-btn" id="auth-mode-toggle" type="button">Create an account</button><button class="text-btn" id="forgot-password" type="button">Forgot password?</button></div>
+          <div class="auth-divider"><span>OR CONTINUE WITH</span></div>
+          <button class="btn google-btn full-width" id="google-signin" type="button"><span class="google-g">G</span> Continue with Google</button>
+          <button class="btn secondary full-width hidden" id="resend-verification" type="button">Resend verification email</button>
+          <button class="btn secondary full-width hidden" id="confirm-verification" type="button">I've verified my email</button>
+          <p class="auth-message" id="auth-message" role="status" aria-live="polite"></p>
+          <div id="bootstrap-panel" class="hidden"><label for="bootstrap-secret">One-time Super Admin activation secret</label><input id="bootstrap-secret" type="password" autocomplete="off" placeholder="Enter activation secret" /><button class="btn primary full-width" id="activate-super-admin" type="button">Activate Super Admin</button><p class="auth-message" id="bootstrap-message" role="status"></p></div>
+          <p class="auth-footnote"><span>▣</span> Access is based on your assigned account permissions.</p>
+        </aside>
+      </main>
+      <section class="landing-features" id="platform">
+        <div class="feature-heading"><span>THE PLATFORM</span><h2>Everything important, <em>in one place.</em></h2><p>Purpose-built tools for transparent device and account operations.</p></div>
+        <div class="feature-grid">
+          <article class="feature-card"><div class="feature-icon cyan">▣</div><h3>Device visibility</h3><p>See enrolled devices, ownership status and their latest reported check-ins.</p><span>01 / DEVICE OVERSIGHT</span></article>
+          <article class="feature-card"><div class="feature-icon violet">♙</div><h3>Role-based access</h3><p>Keep Super Admin, Admin, Assistant and Normal User permissions distinct.</p><span>02 / ACCESS CONTROL</span></article>
+          <article class="feature-card"><div class="feature-icon green">◷</div><h3>Recorded activity</h3><p>Review available account, enrollment and operational records in one workspace.</p><span>03 / ACCOUNTABILITY</span></article>
         </div>
-        <div class="auth-divider"><span>OR</span></div>
-        <button class="btn secondary full-width" id="google-signin">Continue with Google</button>
-        <button class="btn secondary full-width hidden" id="resend-verification" type="button">Resend verification email</button>
-        <button class="btn secondary full-width hidden" id="confirm-verification" type="button">I've verified my email</button>
-        <p class="auth-message" id="auth-message" role="status"></p>
-        <div id="bootstrap-panel" class="hidden">
-          <label for="bootstrap-secret">One-time Super Admin activation secret</label>
-          <input id="bootstrap-secret" type="password" autocomplete="off" placeholder="Paste the secret saved in Vercel" />
-          <button class="btn primary full-width" id="activate-super-admin" type="button">Activate Super Admin</button>
-          <p class="auth-message" id="bootstrap-message" role="status"></p>
-        </div>
-        <small>Access is restricted to accounts with an approved staff role.</small>
-      </div>
+      </section>
+      <section class="landing-bottom" id="how-it-works"><div><span>DESIGNED AROUND CONTROL</span><h2>Clear access.<br/>Clear ownership.</h2></div><p>Devices are linked using a one-time enrollment code generated by their account owner. Management access is permission-based, and device users retain visibility and control.</p><a href="#auth-panel">Sign in to continue ↗</a></section>
+      <footer class="landing-footer" id="security"><span>© 2026 Z3X FINANCE AGENT</span><span>Firebase-backed · Authorized access only</span></footer>
     </section>
-
     <div class="shell hidden" id="portal">
       <aside class="sidebar">
         <a class="brand" href="#"><span class="brand-mark">Z</span><span><b>Z3X</b><small>FINANCE AGENT</small></span></a>
