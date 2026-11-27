@@ -155,6 +155,11 @@ private fun DeviceDashboard(
     val context = androidx.compose.ui.platform.LocalContext.current
     var confirmEnrollment by remember { mutableStateOf(false) }
     var deviceNotice by remember { mutableStateOf(contextNotice(context.applicationContext)) }
+    val identityPrefs = remember(context) {
+        context.applicationContext.getSharedPreferences("z3x_device_identity", android.content.Context.MODE_PRIVATE)
+    }
+    var lastCheckIn by remember { mutableLongStateOf(identityPrefs.getLong("last_checkin_at", 0L)) }
+    var syncError by remember { mutableStateOf(identityPrefs.getString("last_checkin_error", null)) }
 
     DisposableEffect(userId) {
         val registration = repository.observeMyDevices(
@@ -166,12 +171,15 @@ private fun DeviceDashboard(
     }
 
     DisposableEffect(context) {
-        val noticePrefs = context.applicationContext.getSharedPreferences("z3x_device_identity", android.content.Context.MODE_PRIVATE)
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
-            if (key == "last_device_notice") deviceNotice = prefs.getString("last_device_notice", null)
+            when (key) {
+                "last_device_notice" -> deviceNotice = prefs.getString("last_device_notice", null)
+                "last_checkin_at" -> lastCheckIn = prefs.getLong("last_checkin_at", 0L)
+                "last_checkin_error" -> syncError = prefs.getString("last_checkin_error", null)
+            }
         }
-        noticePrefs.registerOnSharedPreferenceChangeListener(listener)
-        onDispose { noticePrefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        identityPrefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { identityPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     var localStatus by remember { mutableStateOf<com.dom.manager.device.DeviceSnapshot?>(null) }
     LaunchedEffect(userId) {
@@ -217,6 +225,25 @@ private fun DeviceDashboard(
                         deviceNotice = null
                     }) { Text("Dismiss notice") }
                 }
+            }
+        }
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Agent health", style = MaterialTheme.typography.titleLarge)
+                val enrolledHere = identityPrefs.getBoolean("is_enrolled", false) &&
+                    identityPrefs.getString("owner_uid", null) == userId
+                InfoRow("Enrollment", if (enrolledHere) "Linked to this account" else "Not linked")
+                InfoRow("Background sync", if (enrolledHere) "Scheduled when Android permits" else "Not scheduled")
+                InfoRow(
+                    "Last successful sync",
+                    if (lastCheckIn > 0L) java.text.DateFormat.getDateTimeInstance().format(java.util.Date(lastCheckIn)) else "Not yet recorded"
+                )
+                syncError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                OutlinedButton(
+                    onClick = { DeviceCheckInScheduler.checkInNow(context.applicationContext) },
+                    enabled = enrolledHere,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Sync now") }
             }
         }
         Card(Modifier.fillMaxWidth()) {

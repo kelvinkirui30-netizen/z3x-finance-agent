@@ -24,14 +24,19 @@ class DeviceCheckInWorker(
             prefs.getString("owner_uid", null) != user.uid) return Result.success()
 
         val token = try {
-            Tasks.await(user.getIdToken(true)).token ?: return Result.retry()
+            Tasks.await(user.getIdToken(true)).token ?: run {
+                recordError(prefs, "Could not refresh the sign-in session. Open the app and sign in again.")
+                return Result.retry()
+            }
         } catch (_: Exception) {
+            recordError(prefs, "Could not refresh the sign-in session. Open the app and sign in again.")
             return Result.retry()
         }
 
         val snapshot = try {
             DeviceStatusRepository(applicationContext).read()
         } catch (_: Exception) {
+            recordError(prefs, "Unable to read device status. The next scheduled check-in will retry.")
             return Result.retry()
         }
         val managementMode = when {
@@ -67,20 +72,45 @@ class DeviceCheckInWorker(
             }
             connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
             when (connection.responseCode) {
-                in 200..299 -> if (DeviceCommandProcessor.process(applicationContext, installId, token)) Result.success() else Result.retry()
-                401, 408, 429 -> Result.retry()
+                in 200..299 -> {
+                    prefs.edit().putLong("last_checkin_at", System.currentTimeMillis()).remove("last_checkin_error").apply()
+                    if (DeviceCommandProcessor.process(applicationContext, installId, token)) Result.success()
+                    else {
+                        recordError(prefs, "Device status synced, but a pending device request could not be acknowledged. It will retry.")
+                        Result.retry()
+                    }
+                }
+                401, 408, 429 -> {
+                    recordError(prefs, "Temporary authentication or network issue. The agent will retry.")
+                    Result.retry()
+                }
                 403, 404, 410 -> {
                     DeviceCheckInScheduler.cancel(applicationContext)
-                    prefs.edit().putBoolean("is_enrolled", false).remove("owner_uid").apply()
+                    prefs.edit()
+                        .putBoolean("is_enrolled", false)
+                        .remove("owner_uid")
+                        .putString("last_checkin_error", "This installation is no longer linked to the signed-in account. Link it again from the portal if needed.")
+                        .apply()
                     Result.success()
                 }
-                in 500..599 -> Result.retry()
-                else -> Result.failure()
+                in 500..599 -> {
+                    recordError(prefs, "The server is temporarily unavailable. The agent will retry.")
+                    Result.retry()
+                }
+                else -> {
+                    recordError(prefs, "The server rejected this check-in. Review enrollment in the app.")
+                    Result.failure()
+                }
             }
         } catch (_: Exception) {
+            recordError(prefs, "Network unavailable. The agent will retry when Android allows.")
             Result.retry()
         } finally {
             connection?.disconnect()
         }
+    }
+
+    private fun recordError(prefs: android.content.SharedPreferences, message: String) {
+        prefs.edit().putString("last_checkin_error", message).apply()
     }
 }
