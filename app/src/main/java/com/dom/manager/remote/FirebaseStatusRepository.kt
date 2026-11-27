@@ -199,7 +199,11 @@ class FirebaseStatusRepository(
         )
         db.collection("users").document(user.uid).set(profile, SetOptions.merge())
             .addOnSuccessListener { onResult(Result.success(user)) }
-            .addOnFailureListener { onResult(Result.failure(it)) }
+            .addOnFailureListener {
+                // Firebase Authentication remains authoritative even when the
+                // optional profile document cannot be written yet.
+                onResult(Result.success(user))
+            }
     }
 
     fun observeMyDevices(
