@@ -63,7 +63,8 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 - [x] Android app accepts the code and requires an explicit confirmation before sending the enrollment request.
 - [x] Trusted API verifies the Firebase ID token and requires the same account that generated the code.
 - [x] Enrollment consumes the code and creates the device record in one Firestore transaction; repeat use and cross-account use are rejected.
-- [x] The app submits an app-generated persistent installation UUID and a limited device inventory: manufacturer, model, Android version/API, app version and actual Device Owner/Profile Owner/Standard Access state.
+- [x] The app submits a stable app-specific installation UUID derived from Android's signing-key-scoped ANDROID_ID (the raw ID is never transmitted) and a limited device inventory.
+- [x] Add owner-authenticated enrollment restoration after reinstall: only the same Firebase account and same device installation identity can restore an active server enrollment; explicit unlinking remains permanent until a new code is issued.
 - [x] Add automated validation tests for code format/expiry/ownership, installation UUIDs, device payloads, management modes and enrollment state.\n- [ ] Add emulator-backed endpoint integration tests for expiry, replay, cross-account use, invalid payloads and concurrent transaction races.
 - [x] Add owner-authenticated device check-in API; it updates inventory only when the signed-in account matches the enrolled owner.
 - [x] Add network-constrained WorkManager check-ins (minimum 15-minute periodic interval) with retry on transient connectivity/server errors.
@@ -158,9 +159,9 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 
 | Area | Current repository evidence | Remaining work |
 |---|---|---|
-| Android authentication | Firebase email/password registration, sign-in and password reset | Email verification policy and account lifecycle review |
+| Android authentication | Firebase email/password registration, sign-in and password reset; owner-only device link restoration after reinstall | Email verification policy and account lifecycle review |
 | Device status | Ongoing check-in reports management mode, runtime capability flags, battery/charging, app version and API level | Real-device verification and staff health presentation |
-| Device enrollment | One-time code generation, authenticated same-account binding, on-device confirmation and atomic consume/create flow implemented | Add endpoint tests, revoke/unenroll and real-device verification |
+| Device enrollment | One-time code, explicit confirmation, atomic redemption, owner-only restoration after reinstall and server-enforced unlink | Real-device verification, factory-reset behavior and signing-key continuity |
 | Device check-in | Owner-verified API and 15-minute minimum periodic WorkManager check-in implemented | Real-device verification, offline queue validation and health model |
 | Self-healing | WorkManager check-ins, boot/app-update rescheduling, manual sync and local recovery status | Real-device reboot/offline/process-death acceptance |
 | Tamper monitoring | Audit events for management-mode, app-version and capability changes | Stronger device attestation, offline event queue and staff alerts |

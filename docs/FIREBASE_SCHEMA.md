@@ -26,7 +26,7 @@ Profile fields: `displayName`, `email`, `createdAt`, `updatedAt`. Authorization 
 Server-managed device inventory. Proposed fields:
 
 - `ownerUid`, `displayName`, `manufacturer`, `model`
-- `androidVersion`, `appVersion`, `managementMode`
+- `androidVersion`, `appVersion`, `managementMode`, `managementCapabilities`
 - `enrollmentStatus`, `enrolledAt`, `lastSeenAt`
 - `batteryLevel`, `appliedPolicyVersion`, `createdAt`, `updatedAt`
 
