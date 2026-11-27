@@ -73,7 +73,7 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 **Exit criteria:** core enrollment lifecycle is implemented and unit validation tests pass in CI; production acceptance remains pending until endpoint integration tests, deployed API and real-device verification pass.
 
 ### Phase 3 — Device identity, inventory and capability discovery
-**Status: Initial identity fields are now reported during enrollment; ongoing check-in and expanded capability discovery pending**
+**Status: Android capability reporting, periodic telemetry and owner-only finance display implemented; portal presentation and real-device verification pending**
 - [x] Enrollment reports manufacturer, model, Android release/API, app version, app-generated installation ID and actual management mode (including Device Admin).
 - [x] Capture battery percentage and charging state through Android's BatteryManager when available.
 - [x] Show the enrolled device's reported model, Android version, management mode, battery and last-seen time in the personal portal.
@@ -87,6 +87,7 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 **Exit criteria:** portal values come from device check-ins, not manual device-detail entry; unsupported fields are marked unavailable.
 
 ### Phase 4 — Android reliability and self-healing
+**Status: WorkManager recovery, boot/app-update rescheduling, manual sync and local health status implemented; real-device recovery tests pending**
 - Add a health model for app process/service status, last successful sync, scheduled work, permission state and policy/config version.
 - [x] Use Android-supported WorkManager jobs for network-constrained device check-ins and synchronization.
 - [x] Use Android-supported WorkManager for network-constrained periodic check-ins and immediate post-enrollment synchronization.
@@ -157,16 +158,16 @@ Firebase project: `device-owner-manager`. Android application ID: `com.dom.manag
 
 | Area | Current repository evidence | Remaining work |
 |---|---|---|
-| Android authentication | Email/password Firebase Auth screen exists | Confirm account policy, errors and profile rules |
-| Device status | Manufacturer/model/Android/API, Device Owner/Profile Owner/Device Admin/Standard Access, battery/charging reported on enrollment | Add ongoing check-in, capability matrix and battery refresh |
+| Android authentication | Firebase email/password registration, sign-in and password reset | Email verification policy and account lifecycle review |
+| Device status | Ongoing check-in reports management mode, runtime capability flags, battery/charging, app version and API level | Real-device verification and staff health presentation |
 | Device enrollment | One-time code generation, authenticated same-account binding, on-device confirmation and atomic consume/create flow implemented | Add endpoint tests, revoke/unenroll and real-device verification |
 | Device check-in | Owner-verified API and 15-minute minimum periodic WorkManager check-in implemented | Real-device verification, offline queue validation and health model |
-| Self-healing | Not implemented | Phase 4 |
-| Tamper monitoring | Not implemented | Phase 5 |
-| Signed commands | Not implemented | Phase 6 |
+| Self-healing | WorkManager check-ins, boot/app-update rescheduling, manual sync and local recovery status | Real-device reboot/offline/process-death acceptance |
+| Tamper monitoring | Audit events for management-mode, app-version and capability changes | Stronger device attestation, offline event queue and staff alerts |
+| Device commands | Admin APIs issue only check-in requests and visible notices; delivery uses short leases and one-time nonce verification | Staff UI, recovery guidance command and stronger attestation |
 | Portal role views | Partial scaffold exists | Audit and complete Phase 7 |
 | Staff management API | Partial endpoint exists | Harden, paginate and test Phase 1 |
-| Finance records | Rules/schema proposal exists; no complete workflows | Phase 8 |
+| Finance records | Android displays the signed-in user's own schedule and recorded payments read-only | Web finance entry/reconciliation workflows and end-to-end testing |
 | Firestore rules | Draft exists in repository | Test and deploy only after review |
 | CI | Firestore Emulator rules suite passes; latest Android and web builds are running for enrollment changes | Verify latest Android/web runs and add enrollment API tests |
 | Vercel | Project deployed by owner | Verify latest deployment and server functions |
