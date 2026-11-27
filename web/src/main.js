@@ -172,17 +172,11 @@ if (missing.length) {
     }
     try {
       const emailProvider = user.providerData.some((providerInfo) => providerInfo.providerId === "password");
-      if (emailProvider && !user.emailVerified) {
-        portal.classList.add("hidden");
-        authScreen.classList.remove("hidden");
-        $("#bootstrap-panel").classList.add("hidden");
-        $("#resend-verification").classList.remove("hidden");
-        $("#confirm-verification").classList.remove("hidden");
-        authMessage.textContent = "Please verify your email address before entering the portal. Check your inbox or request another verification email below.";
-        return;
-      }
       $("#resend-verification").classList.add("hidden");
       $("#confirm-verification").classList.add("hidden");
+      if (emailProvider && !user.emailVerified) {
+        authMessage.textContent = "You're signed in. You can verify your email later from your account inbox; portal access is available now.";
+      }
       const token = await user.getIdTokenResult(true);
       const role = token.claims.role || "user";
       if (role !== "super_admin" && role !== "admin" && role !== "assistant" && role !== "user") {
@@ -216,6 +210,7 @@ if (missing.length) {
         await loadDashboard(db);
         wireNavigation(db);
         wireAdminTools();
+        wireEnrollmentCode(user, db);
       }
     } catch (error) {
       await signOut(auth);
@@ -288,11 +283,27 @@ function showToast(message) {
 
 
 async function loadPersonalDashboard(db, user) {
+  const readOwnCollection = async (name) => {
+    try {
+      return await getDocs(query(collection(db, name), where("ownerUid", "==", user.uid)));
+    } catch (error) {
+      console.warn("Personal collection unavailable:", name, error?.code || error);
+      return { size: 0, docs: [], unavailable: true };
+    }
+  };
   const [devices, schedules, payments] = await Promise.all([
-    getDocs(query(collection(db, "devices"), where("ownerUid", "==", user.uid))),
-    getDocs(query(collection(db, "device_installments"), where("ownerUid", "==", user.uid))),
-    getDocs(query(collection(db, "device_installment_payments"), where("ownerUid", "==", user.uid)))
+    readOwnCollection("devices"),
+    readOwnCollection("device_installments"),
+    readOwnCollection("device_installment_payments")
   ]);
+  const restricted = [devices, schedules, payments].some((snapshot) => snapshot.unavailable);
+  const warning = $("#my-data-warning");
+  if (warning) {
+    warning.classList.toggle("hidden", !restricted);
+    warning.textContent = restricted
+      ? "Some personal records are not available yet. You can still use the portal and generate a device enrollment code."
+      : "";
+  }
   $("#my-device-count").textContent = devices.size;
   $("#my-schedule-count").textContent = schedules.size;
   $("#my-payment-count").textContent = payments.size;
@@ -406,6 +417,21 @@ function wireAdminTools() {
 }
 
 function wireNavigation(db) {
+  const sidebar = $("#portal-sidebar");
+  const menuButton = $("#mobile-menu-toggle");
+  const backdrop = $("#sidebar-backdrop");
+  const closeMenu = () => {
+    sidebar?.classList.remove("open");
+    backdrop?.classList.remove("visible");
+    menuButton?.setAttribute("aria-expanded", "false");
+  };
+  menuButton?.addEventListener("click", () => {
+    const open = !sidebar.classList.contains("open");
+    sidebar.classList.toggle("open", open);
+    backdrop?.classList.toggle("visible", open);
+    menuButton.setAttribute("aria-expanded", String(open));
+  });
+  backdrop?.addEventListener("click", closeMenu);
   document.querySelectorAll("[data-view], [data-go]").forEach((el) => {
     if (el.dataset.wired) return;
     el.dataset.wired = "1";
@@ -416,6 +442,7 @@ function wireNavigation(db) {
       document.querySelectorAll(".nav").forEach((nav) => nav.classList.toggle("active", nav.dataset.view === name));
       const titles = { overview:"Overview", devices:"Devices", policies:"Policies", applications:"Applications", compliance:"Compliance", users:"User management", staff:"Staff management", activity:"Activity log" };
       $("#page-title").textContent = titles[name] || "Overview";
+      closeMenu();
     });
   });
   $("#refresh").onclick = () => loadDashboard(db);
