@@ -152,12 +152,9 @@ private fun DeviceDashboard(
     var enrollmentCode by remember { mutableStateOf("") }
     var enrollmentBusy by remember { mutableStateOf(false) }
     var enrollmentMessage by remember { mutableStateOf<String?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     var confirmEnrollment by remember { mutableStateOf(false) }
-    var deviceNotice by remember {
-        mutableStateOf(
-            contextNotice(androidx.compose.ui.platform.LocalContext.current.applicationContext)
-        )
-    }
+    var deviceNotice by remember { mutableStateOf(contextNotice(context.applicationContext)) }
 
     DisposableEffect(userId) {
         val registration = repository.observeMyDevices(
@@ -168,7 +165,6 @@ private fun DeviceDashboard(
         onDispose { registration.remove() }
     }
 
-    val context = androidx.compose.ui.platform.LocalContext.current
     DisposableEffect(context) {
         val noticePrefs = context.applicationContext.getSharedPreferences("z3x_device_identity", android.content.Context.MODE_PRIVATE)
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
