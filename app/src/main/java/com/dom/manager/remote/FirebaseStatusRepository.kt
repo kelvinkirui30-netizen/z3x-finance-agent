@@ -30,6 +30,24 @@ data class ManagedDevice(
     val lastSeenAt: Timestamp?
 )
 
+data class FinanceInstallment(
+    val id: String,
+    val deviceId: String,
+    val label: String,
+    val amountMinor: Long,
+    val currencyCode: String,
+    val dueDate: Timestamp?
+)
+
+data class FinancePayment(
+    val id: String,
+    val installmentId: String,
+    val amountMinor: Long,
+    val currencyCode: String,
+    val paidAt: Timestamp?,
+    val reference: String
+)
+
 class FirebaseStatusRepository(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
@@ -117,6 +135,52 @@ class FirebaseStatusRepository(
             })
         }
 
+
+    fun observeMyInstallments(
+        uid: String,
+        onChange: (List<FinanceInstallment>) -> Unit,
+        onError: (Exception) -> Unit
+    ): ListenerRegistration = db.collection("device_installments")
+        .whereEqualTo("ownerUid", uid)
+        .addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                onError(error)
+                return@addSnapshotListener
+            }
+            onChange(snapshot?.documents.orEmpty().map { doc ->
+                FinanceInstallment(
+                    id = doc.id,
+                    deviceId = doc.getString("deviceId").orEmpty(),
+                    label = doc.getString("label").orEmpty(),
+                    amountMinor = doc.getLong("amountMinor") ?: 0L,
+                    currencyCode = doc.getString("currencyCode") ?: "KES",
+                    dueDate = doc.getTimestamp("dueDate")
+                )
+            }.sortedBy { it.dueDate?.toDate()?.time ?: Long.MAX_VALUE })
+        }
+
+    fun observeMyPayments(
+        uid: String,
+        onChange: (List<FinancePayment>) -> Unit,
+        onError: (Exception) -> Unit
+    ): ListenerRegistration = db.collection("device_installment_payments")
+        .whereEqualTo("ownerUid", uid)
+        .addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                onError(error)
+                return@addSnapshotListener
+            }
+            onChange(snapshot?.documents.orEmpty().map { doc ->
+                FinancePayment(
+                    id = doc.id,
+                    installmentId = doc.getString("installmentId").orEmpty(),
+                    amountMinor = doc.getLong("amountMinor") ?: 0L,
+                    currencyCode = doc.getString("currencyCode") ?: "KES",
+                    paidAt = doc.getTimestamp("paidAt"),
+                    reference = doc.getString("reference").orEmpty()
+                )
+            }.sortedByDescending { it.paidAt?.toDate()?.time ?: 0L })
+        }
 
     fun enrollCurrentDevice(
         context: Context,

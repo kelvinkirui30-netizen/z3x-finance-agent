@@ -17,6 +17,8 @@ import com.dom.manager.device.DeviceStatusRepository
 import com.dom.manager.remote.DeviceCheckInScheduler
 import com.dom.manager.remote.FirebaseStatusRepository
 import com.dom.manager.remote.ManagedDevice
+import com.dom.manager.remote.FinanceInstallment
+import com.dom.manager.remote.FinancePayment
 import com.google.firebase.auth.FirebaseUser
 
 class MainActivity : ComponentActivity() {
@@ -147,6 +149,9 @@ private fun DeviceDashboard(
     onSignOut: () -> Unit
 ) {
     var devices by remember { mutableStateOf<List<ManagedDevice>>(emptyList()) }
+    var installments by remember { mutableStateOf<List<FinanceInstallment>>(emptyList()) }
+    var payments by remember { mutableStateOf<List<FinancePayment>>(emptyList()) }
+    var financeError by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
     var enrollmentCode by remember { mutableStateOf("") }
@@ -167,7 +172,21 @@ private fun DeviceDashboard(
             onChange = { devices = it; loading = false; error = null },
             onError = { loading = false; error = it.localizedMessage ?: "Unable to load devices." }
         )
-        onDispose { registration.remove() }
+        val installmentRegistration = repository.observeMyInstallments(
+            uid = userId,
+            onChange = { installments = it; financeError = null },
+            onError = { financeError = it.localizedMessage ?: "Unable to load your finance schedule." }
+        )
+        val paymentRegistration = repository.observeMyPayments(
+            uid = userId,
+            onChange = { payments = it; financeError = null },
+            onError = { financeError = it.localizedMessage ?: "Unable to load your payment history." }
+        )
+        onDispose {
+            registration.remove()
+            installmentRegistration.remove()
+            paymentRegistration.remove()
+        }
     }
 
     DisposableEffect(context) {
@@ -227,6 +246,8 @@ private fun DeviceDashboard(
                 }
             }
         }
+        FinanceCard(installments, payments, financeError)
+
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Agent health", style = MaterialTheme.typography.titleLarge)
@@ -329,6 +350,84 @@ private fun DeviceDashboard(
             "After enrollment, the portal can show the device details reported by this agent. Installing this app alone does not enroll a device.",
             style = MaterialTheme.typography.bodySmall
         )
+    }
+}
+
+@Composable
+private fun FinanceCard(
+    installments: List<FinanceInstallment>,
+    payments: List<FinancePayment>,
+    error: String?
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("My finance plan", style = MaterialTheme.typography.titleLarge)
+            if (error != null) {
+                Text(error, color = MaterialTheme.colorScheme.error)
+            } else if (installments.isEmpty()) {
+                Text("No finance schedule has been assigned to this account yet.")
+            } else {
+                val currencies = installments.map { it.currencyCode }.distinct()
+                currencies.forEach { currency ->
+                    val scheduled = installments.filter { it.currencyCode == currency }.sumOf { it.amountMinor }
+                    val paid = payments.filter { it.currencyCode == currency }.sumOf { it.amountMinor }
+                    InfoRow("Scheduled ($currency)", formatMoney(scheduled, currency))
+                    InfoRow("Recorded payments ($currency)", formatMoney(paid, currency))
+                    InfoRow("Remaining ($currency)", formatMoney((scheduled - paid).coerceAtLeast(0L), currency))
+                }
+                Text("Installment schedule", style = MaterialTheme.typography.titleMedium)
+                installments.forEach { installment ->
+                    val paidForInstallment = payments
+                        .filter { it.installmentId == installment.id && it.currencyCode == installment.currencyCode }
+                        .sumOf { it.amountMinor }
+                    val state = when {
+                        paidForInstallment >= installment.amountMinor -> "Paid"
+                        paidForInstallment > 0L -> "Partially paid"
+                        installment.dueDate != null && installment.dueDate.toDate().time < System.currentTimeMillis() -> "Past due"
+                        else -> "Upcoming"
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        InfoRow(
+                            installment.label.ifBlank { "Installment" },
+                            formatMoney(installment.amountMinor, installment.currencyCode)
+                        )
+                        InfoRow(
+                            "Due",
+                            installment.dueDate?.let { java.text.DateFormat.getDateInstance().format(it.toDate()) } ?: "Date not set"
+                        )
+                        InfoRow("Status", state)
+                    }
+                    HorizontalDivider()
+                }
+                if (payments.isNotEmpty()) {
+                    Text("Recent payments", style = MaterialTheme.typography.titleMedium)
+                    payments.take(5).forEach { payment ->
+                        InfoRow(
+                            payment.paidAt?.let { java.text.DateFormat.getDateInstance().format(it.toDate()) } ?: "Payment recorded",
+                            formatMoney(payment.amountMinor, payment.currencyCode)
+                        )
+                        if (payment.reference.isNotBlank()) {
+                            Text("Reference: ${payment.reference}", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+            Text(
+                "This is a read-only record of payments entered by the finance team. It does not initiate or collect payments.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+private fun formatMoney(amountMinor: Long, currencyCode: String): String {
+    return try {
+        val currency = java.util.Currency.getInstance(currencyCode)
+        val digits = currency.defaultFractionDigits.coerceAtLeast(0)
+        val value = java.math.BigDecimal.valueOf(amountMinor).movePointLeft(digits)
+        java.text.NumberFormat.getCurrencyInstance().apply { this.currency = currency }.format(value)
+    } catch (_: Exception) {
+        "$currencyCode ${amountMinor / 100.0}"
     }
 }
 
