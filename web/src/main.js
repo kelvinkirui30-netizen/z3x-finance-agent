@@ -450,8 +450,6 @@ function wireNavigation(db) {
 
 
 function wireEnrollmentCode(user, db) {
-  const button = $("#generate-enrollment-code");
-  const output = $("#enrollment-code-result");
   const deviceList = $("#my-device-list");
   if (deviceList && !deviceList.dataset.unenrollWired) {
     deviceList.dataset.unenrollWired = "1";
@@ -478,50 +476,56 @@ function wireEnrollmentCode(user, db) {
       }
     });
   }
-  if (!button || button.dataset.wired) return;
-  button.dataset.wired = "1";
-  button.addEventListener("click", async () => {
-    button.disabled = true;
-    output.textContent = "Generating a secure one-time code…";
-    try {
-      const token = await user.getIdToken();
-      const response = await fetch("/api/create-enrollment-code", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + token }
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Could not create an enrollment code.");
-      output.innerHTML = '<div><b style="font-size:28px;letter-spacing:5px">' + escapeHtml(result.code) +
-        '</b></div><p>Enter this code in the Z3X app on your device. It expires at ' +
-        escapeHtml(new Date(result.expiresAt).toLocaleTimeString()) +
-        ' and can only be used once by this account.</p><button class="btn secondary" id="copy-enrollment-code" type="button">Copy code</button> <button class="btn secondary" id="revoke-enrollment-code" type="button">Revoke code</button>';
-      $("#copy-enrollment-code").addEventListener("click", async () => {
-        try { await navigator.clipboard.writeText(result.code); showToast("Enrollment code copied."); }
-        catch { showToast("Copy is unavailable. You can select the code and copy it manually."); }
-      });
-      $("#revoke-enrollment-code").addEventListener("click", async (event) => {
-        const revokeButton = event.currentTarget;
-        if (!window.confirm("Revoke this code? Any device that has not used it will no longer be able to enroll with it.")) return;
-        revokeButton.disabled = true;
-        try {
-          const revokeToken = await user.getIdToken();
-          const revokeResponse = await fetch("/api/revoke-enrollment-code", {
-            method: "POST",
-            headers: { Authorization: "Bearer " + revokeToken, "Content-Type": "application/json" },
-            body: JSON.stringify({ code: result.code })
-          });
-          const revokeResult = await revokeResponse.json();
-          if (!revokeResponse.ok) throw new Error(revokeResult.error || "Could not revoke this code.");
-          output.textContent = revokeResult.message || "Enrollment code revoked.";
-        } catch (revokeError) {
-          showToast(revokeError.message || "Code revocation failed.");
-          revokeButton.disabled = false;
-        }
-      });
-    } catch (error) {
-      output.textContent = error.message || "Enrollment code generation failed.";
-    } finally {
-      button.disabled = false;
-    }
+
+  document.querySelectorAll("[data-generate-enrollment-code]").forEach((button) => {
+    if (button.dataset.wired) return;
+    button.dataset.wired = "1";
+    const panel = button.closest(".panel");
+    const output = panel?.querySelector("[data-enrollment-code-result]");
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      if (output) output.textContent = "Generating a secure one-time code…";
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch("/api/create-enrollment-code", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token }
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Could not create an enrollment code.");
+        if (!output) throw new Error("Enrollment result area is missing.");
+        output.innerHTML = '<div><b style="font-size:28px;letter-spacing:5px">' + escapeHtml(result.code) +
+          '</b></div><p>Enter this code in the Z3X app on the device. It expires at ' +
+          escapeHtml(new Date(result.expiresAt).toLocaleTimeString()) +
+          ' and can only be used once by this account.</p><button class="btn secondary" data-copy-enrollment-code type="button">Copy code</button> <button class="btn secondary" data-revoke-enrollment-code type="button">Revoke code</button>';
+        output.querySelector("[data-copy-enrollment-code]").addEventListener("click", async () => {
+          try { await navigator.clipboard.writeText(result.code); showToast("Enrollment code copied."); }
+          catch { showToast("Copy is unavailable. You can select the code and copy it manually."); }
+        });
+        output.querySelector("[data-revoke-enrollment-code]").addEventListener("click", async (event) => {
+          const revokeButton = event.currentTarget;
+          if (!window.confirm("Revoke this code? Any device that has not used it will no longer be able to enroll with it.")) return;
+          revokeButton.disabled = true;
+          try {
+            const revokeToken = await user.getIdToken();
+            const revokeResponse = await fetch("/api/revoke-enrollment-code", {
+              method: "POST",
+              headers: { Authorization: "Bearer " + revokeToken, "Content-Type": "application/json" },
+              body: JSON.stringify({ code: result.code })
+            });
+            const revokeResult = await revokeResponse.json();
+            if (!revokeResponse.ok) throw new Error(revokeResult.error || "Could not revoke this code.");
+            output.textContent = revokeResult.message || "Enrollment code revoked.";
+          } catch (revokeError) {
+            showToast(revokeError.message || "Code revocation failed.");
+            revokeButton.disabled = false;
+          }
+        });
+      } catch (error) {
+        if (output) output.textContent = error.message || "Enrollment code generation failed.";
+      } finally {
+        button.disabled = false;
+      }
+    });
   });
 }
