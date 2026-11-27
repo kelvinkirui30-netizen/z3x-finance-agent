@@ -410,12 +410,7 @@ class FirebaseStatusRepository(
                     Handler(Looper.getMainLooper()).post { onResult(result) }
                 }.start()
             }
-            .addOnFailureListener {
-                // Firebase Authentication is the source of account identity.
-                // A profile document is optional for the Android agent and may
-                // be unavailable until production Firestore rules are deployed.
-                onResult(Result.success(user))
-            }
+            .addOnFailureListener { onResult(Result.failure(it)) }
     }
 
     fun signOut() = auth.signOut()
