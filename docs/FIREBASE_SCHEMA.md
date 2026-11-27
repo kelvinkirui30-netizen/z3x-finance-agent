@@ -30,7 +30,7 @@ Server-managed device inventory. Proposed fields:
 - `enrollmentStatus`, `enrolledAt`, `lastSeenAt`
 - `batteryLevel`, `appliedPolicyVersion`, `createdAt`, `updatedAt`
 
-Device credentials/secrets must never be stored in a document readable by browser clients. Store only a one-way verifier/hash or use a server-issued Firebase custom token flow. The Android app must not contain Admin SDK credentials.
+Device credentials/secrets must never be stored in a document readable by browser clients. The Android app must not contain Admin SDK credentials. Its app-specific installation UUID is derived from Android's signing-key-scoped ANDROID_ID; the raw Android ID is never transmitted. This lets the same Firebase account restore an active enrollment after reinstalling the same signed app on the same device. A factory reset or signing-certificate change can create a new identifier. Explicit server-side unlinking remains in force and cannot be undone by reinstalling.
 
 ### `enrollment_codes/{codeId}`
 
