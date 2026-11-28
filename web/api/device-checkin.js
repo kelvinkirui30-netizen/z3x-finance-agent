@@ -1,5 +1,6 @@
 import { createHash, createPublicKey, verify as verifySignature } from "node:crypto";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { isValidInstallId, normalizeDevicePayload, isDeviceEnrolled } from "../lib/device-validation.js";
 import { canonicalDevicePayload } from "../lib/device-crypto.js";
@@ -13,14 +14,14 @@ function send(res, status, body) {
 function services() {
   if (process.env.FIRESTORE_EMULATOR_HOST) {
     const app = getApps()[0] || initializeApp({ projectId: PROJECT_ID });
-    return getFirestore(app);
+    return { auth: getAuth(app), db: getFirestore(app) };
   }
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) throw new Error("Missing Firebase Admin credential.");
   const account = JSON.parse(raw);
   if (account.project_id !== PROJECT_ID) throw new Error("Wrong Firebase project.");
   const app = getApps()[0] || initializeApp({ credential: cert(account), projectId: PROJECT_ID });
-  return getFirestore(app);
+  return { auth: getAuth(app), db: getFirestore(app) };
 }
 export function deviceSignatureMessage(installId, challenge, device) {
   const digest = createHash("sha256").update(canonicalDevicePayload(device)).digest("hex");
@@ -29,7 +30,7 @@ export function deviceSignatureMessage(installId, challenge, device) {
 export default async function handler(req, res) {
   if (req.method !== "POST") { res.setHeader("Allow", "POST"); return send(res, 405, { error: "Method not allowed." }); }
   try {
-    const db = services();
+    const { auth, db } = services();
     const body = req.body || {};
     const installId = String(body.installId || "");
     if (!isValidInstallId(installId)) return send(res, 400, { error: "Invalid app installation identifier." });
@@ -38,8 +39,29 @@ export default async function handler(req, res) {
     const deviceSnap = await db.collection("devices").doc(installId).get();
     if (!deviceSnap.exists || !isDeviceEnrolled(deviceSnap.data())) return send(res, 404, { error: "This device is not enrolled." });
     const deviceRecord = deviceSnap.data();
+    if (!deviceRecord.devicePublicKeyPem && !deviceRecord.deviceAuthStatus) {
+      // Temporary compatibility for already-enrolled legacy agents. New
+      // enrollments always carry a device key; staff key registration migrates
+      // existing records and permanently moves them to signed-device auth.
+      const bearer = String(req.headers.authorization || "").match(/^Bearer\\s+(.+)$/i);
+      if (!bearer) return send(res, 401, { error: "Legacy device migration requires an authenticated staff session." });
+      const user = await auth.verifyIdToken(bearer[1], !process.env.FIRESTORE_EMULATOR_HOST);
+      if (deviceRecord.ownerUid !== user.uid) return send(res, 403, { error: "This device is not linked to the signed-in staff account." });
+      const { sdkInt, batteryLevel, isCharging, ...legacyPatch } = normalized.value;
+      await db.runTransaction(async (tx) => {
+        const current = await tx.get(db.collection("devices").doc(installId));
+        if (!current.exists || !isDeviceEnrolled(current.data()) || current.data().devicePublicKeyPem) {
+          throw Object.assign(new Error("Device credentials changed; retry with the current agent."), { status: 409 });
+        }
+        tx.update(db.collection("devices").doc(installId), {
+          ...legacyPatch, sdkInt, batteryLevel, isCharging,
+          lastSeenAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
+        });
+      });
+      return send(res, 200, { success: true, legacyCompatibility: true, checkedInAt: new Date().toISOString() });
+    }
     if (!deviceRecord.devicePublicKeyPem || deviceRecord.deviceAuthStatus !== "active") {
-      return send(res, 409, { error: "This device requires staff-assisted cryptographic provisioning." });
+      return send(res, 403, { error: "Device authorization is disabled. Contact authorized staff." });
     }
     const challenge = String(body.challenge || "");
     const signature = String(body.signature || "");
