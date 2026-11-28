@@ -376,9 +376,11 @@ class FirebaseStatusRepository(
                     snapshot.isDeviceAdmin -> "device_admin"
                     else -> "standard_access"
                 }
+                val publicKeyPem = DeviceKeyStore.publicKeyPem(installId)
                 val payload = JSONObject().apply {
                     put("code", code)
                     put("installId", installId)
+                    put("publicKeyPem", publicKeyPem)
                     put("device", JSONObject().apply {
                         put("manufacturer", snapshot.manufacturer.take(120))
                         put("model", snapshot.model.take(120))
@@ -411,6 +413,7 @@ class FirebaseStatusRepository(
                             prefs.edit()
                                 .putBoolean("is_enrolled", true)
                                 .putString("owner_uid", current.uid)
+                                .putBoolean("device_key_registered", true)
                                 .apply()
                             Result.success(json.optString("message", "Device linked to your account."))
                         } else {

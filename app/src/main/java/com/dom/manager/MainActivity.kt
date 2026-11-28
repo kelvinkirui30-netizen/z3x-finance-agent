@@ -41,7 +41,6 @@ private fun Z3XApp() {
             email = user!!.email.orEmpty(),
             repository = repository,
             onSignOut = {
-                DeviceCheckInScheduler.cancel(appContext)
                 repository.signOut()
                 user = null
             }
@@ -167,7 +166,7 @@ private fun DeviceDashboard(
     var lastCheckIn by remember { mutableLongStateOf(identityPrefs.getLong("last_checkin_at", 0L)) }
     var syncError by remember { mutableStateOf(identityPrefs.getString("last_checkin_error", null)) }
     var isLinkedLocally by remember {
-        mutableStateOf(identityPrefs.getBoolean("is_enrolled", false) && identityPrefs.getString("owner_uid", null) == userId)
+        mutableStateOf(identityPrefs.getBoolean("is_enrolled", false))
     }
 
     fun refreshAccountData() {
@@ -197,7 +196,7 @@ private fun DeviceDashboard(
                 "last_checkin_at" -> lastCheckIn = prefs.getLong("last_checkin_at", 0L)
                 "last_checkin_error" -> syncError = prefs.getString("last_checkin_error", null)
                 "is_enrolled", "owner_uid" -> isLinkedLocally =
-                    prefs.getBoolean("is_enrolled", false) && prefs.getString("owner_uid", null) == userId
+                    prefs.getBoolean("is_enrolled", false)
             }
         }
         identityPrefs.registerOnSharedPreferenceChangeListener(listener)
