@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { randomUUID, generateKeyPairSync } from "node:crypto";
+import { randomUUID, generateKeyPairSync, sign as signMessage } from "node:crypto";
 import createCode from "../web/api/create-enrollment-code.js";
 import deviceChallenge from "../web/api/device-challenge.js";
+import registerDeviceKey from "../web/api/register-device-key.js";
 import { deviceSignatureMessage } from "../web/api/device-checkin.js";
 import enrollDevice from "../web/api/enroll-device.js";
 import checkIn from "../web/api/device-checkin.js";
@@ -74,7 +75,8 @@ const device = {
   managementMode: "standard_access",
   sdkInt: 34,
   batteryLevel: 67,
-  isCharging: false
+  isCharging: false,
+  managementCapabilities: {}
 };
 
 test("company device assignment is staff-controlled and visible only to the assigned customer", async () => {
@@ -157,4 +159,59 @@ test("simultaneous redemption of one code can create only one company device enr
     invoke(enrollDevice, owner.token, payload)
   ]);
   assert.deepEqual(results.map((result) => result.statusCode).sort(), [200, 410]);
+});
+
+
+test("device check-in uses a one-time ECDSA challenge instead of a customer login token", async () => {
+  const admin = await createUser("crypto-device-admin", "admin");
+  const created = await invoke(createCode, admin.token);
+  const installId = randomUUID();
+  const pair = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const keyPem = pair.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const enrolled = await invoke(enrollDevice, admin.token, {
+    code: created.body.code, installId, device, publicKeyPem: keyPem
+  });
+  assert.equal(enrolled.statusCode, 200, JSON.stringify(enrolled.body));
+
+  const challengeResult = await invoke(deviceChallenge, null, { installId });
+  assert.equal(challengeResult.statusCode, 200, JSON.stringify(challengeResult.body));
+  const challenge = challengeResult.body.challenge;
+  const signature = signMessage("sha256", deviceSignatureMessage(installId, challenge, device), pair.privateKey).toString("base64url");
+  const payload = { installId, challenge, signature, device };
+
+  const accepted = await invoke(checkIn, null, payload);
+  assert.equal(accepted.statusCode, 200, JSON.stringify(accepted.body));
+
+  const replay = await invoke(checkIn, null, payload);
+  assert.equal(replay.statusCode, 401, JSON.stringify(replay.body));
+});
+
+test("only staff can rotate a device key and the old key stops authenticating", async () => {
+  const admin = await createUser("crypto-rotate-admin", "admin");
+  const customer = await createUser("crypto-rotate-customer", "user");
+  const created = await invoke(createCode, admin.token);
+  const installId = randomUUID();
+  const original = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const enrolled = await invoke(enrollDevice, admin.token, {
+    code: created.body.code, installId, device,
+    publicKeyPem: original.publicKey.export({ type: "spki", format: "pem" }).toString()
+  });
+  assert.equal(enrolled.statusCode, 200, JSON.stringify(enrolled.body));
+
+  const replacement = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const denied = await invoke(registerDeviceKey, customer.token, {
+    installId, publicKeyPem: replacement.publicKey.export({ type: "spki", format: "pem" }).toString()
+  });
+  assert.equal(denied.statusCode, 403);
+
+  const rotated = await invoke(registerDeviceKey, admin.token, {
+    installId, publicKeyPem: replacement.publicKey.export({ type: "spki", format: "pem" }).toString()
+  });
+  assert.equal(rotated.statusCode, 200, JSON.stringify(rotated.body));
+
+  const challengeResult = await invoke(deviceChallenge, null, { installId });
+  const challenge = challengeResult.body.challenge;
+  const oldSignature = signMessage("sha256", deviceSignatureMessage(installId, challenge, device), original.privateKey).toString("base64url");
+  const rejected = await invoke(checkIn, null, { installId, challenge, signature: oldSignature, device });
+  assert.equal(rejected.statusCode, 401);
 });
