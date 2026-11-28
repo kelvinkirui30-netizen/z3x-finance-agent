@@ -5,6 +5,8 @@ const endpoints = [
   ["create enrollment code", "../web/api/create-enrollment-code.js"],
   ["assign device to customer", "../web/api/assign-device-to-customer.js"],
   ["enroll device", "../web/api/enroll-device.js"],
+  ["device challenge", "../web/api/device-challenge.js"],
+  ["register device key", "../web/api/register-device-key.js"],
   ["device check-in", "../web/api/device-checkin.js"],
   ["device unlink (approval-gated)", "../web/api/unenroll-device.js"],
   ["revoke enrollment code", "../web/api/revoke-enrollment-code.js"],
