@@ -8,6 +8,8 @@ import unenrollDevice from "../web/api/unenroll-device.js";
 import revokeCode from "../web/api/revoke-enrollment-code.js";
 import restoreEnrollment from "../web/api/restore-device-enrollment.js";
 import myAccountData from "../web/api/my-account-data.js";
+import { getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import assignDevice from "../web/api/assign-device-to-customer.js";
 
 const authHost = process.env.FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099";
@@ -26,13 +28,11 @@ async function createUser(label, role = "admin") {
   });
   const data = await response.json();
   assert.equal(response.ok, true, JSON.stringify(data));
-  const claimsResponse = await fetch(`http://${authHost}/identitytoolkit.googleapis.com/v1/accounts:update?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ localId: data.localId, customAttributes: JSON.stringify({ role }) })
+  process.env.FIREBASE_AUTH_EMULATOR_HOST ||= authHost;
+  const adminApp = getApps()[0] || initializeApp({
+    projectId: process.env.FIREBASE_PROJECT_ID || "demo-z3x-finance-agent"
   });
-  const claimsData = await claimsResponse.json();
-  assert.equal(claimsResponse.ok, true, JSON.stringify(claimsData));
+  await getAuth(adminApp).setCustomUserClaims(data.localId, { role });
   const signInResponse = await fetch(`http://${authHost}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
