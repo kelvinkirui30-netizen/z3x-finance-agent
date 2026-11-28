@@ -46,7 +46,7 @@ export default async function handler(req, res) {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deviceId)) {
       return send(res, 400, { error: "Invalid device identifier." });
     }
-    if (customerEmail.length > 254 || !/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(customerEmail)) {
+    if (customerEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
       return send(res, 400, { error: "Enter the customer's registered email address." });
     }
 
