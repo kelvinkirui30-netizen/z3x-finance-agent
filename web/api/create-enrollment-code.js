@@ -40,7 +40,7 @@ export default async function handler(req, res) {
   }
   try {
     const { auth, db } = services();
-    const match = String(req.headers.authorization || "").match(/^Bearer\\s+(.+)$/i);
+    const match = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i);
     if (!match) return send(res, 401, { error: "Sign in is required." });
     const user = await auth.verifyIdToken(match[1], !process.env.FIRESTORE_EMULATOR_HOST);
     if (!STAFF_ROLES.has(user.role || "user")) {

@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   }
   try {
     const { auth, db } = services();
-    const match = String(req.headers.authorization || "").match(/^Bearer\\s+(.+)$/i);
+    const match = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i);
     if (!match) return send(res, 401, { error: "Sign in is required." });
     const actor = await auth.verifyIdToken(match[1], !process.env.FIRESTORE_EMULATOR_HOST);
     const actorRole = actor.role || "user";
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deviceId)) {
       return send(res, 400, { error: "Invalid device identifier." });
     }
-    if (customerEmail.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(customerEmail)) {
+    if (customerEmail.length > 254 || !/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(customerEmail)) {
       return send(res, 400, { error: "Enter the customer's registered email address." });
     }
 
