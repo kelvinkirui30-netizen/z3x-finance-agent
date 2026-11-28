@@ -8,8 +8,10 @@ import unenrollDevice from "../web/api/unenroll-device.js";
 import revokeCode from "../web/api/revoke-enrollment-code.js";
 import restoreEnrollment from "../web/api/restore-device-enrollment.js";
 import myAccountData from "../web/api/my-account-data.js";
-import { getApps, initializeApp } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
+import { createRequire } from "node:module";
+const requireWeb = createRequire(new URL("../web/package.json", import.meta.url));
+const { getApps, initializeApp } = requireWeb("firebase-admin/app");
+const { getAuth } = requireWeb("firebase-admin/auth");
 import assignDevice from "../web/api/assign-device-to-customer.js";
 
 const authHost = process.env.FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099";
