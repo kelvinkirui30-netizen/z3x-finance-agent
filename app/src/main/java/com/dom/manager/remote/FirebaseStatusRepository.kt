@@ -62,6 +62,18 @@ class FirebaseStatusRepository(
 ) {
     fun currentUser(): FirebaseUser? = auth.currentUser
 
+    private fun parseApiJson(body: String, status: Int, endpoint: String): JSONObject {
+        val trimmed = body.trim()
+        return try {
+            JSONObject(trimmed.ifBlank { "{}" })
+        } catch (_: Exception) {
+            throw IllegalStateException(
+                "$endpoint returned an unexpected non-JSON response (HTTP $status). " +
+                    "The backend route may not be deployed or may be returning an error page. Please retry after the API deployment is verified."
+            )
+        }
+    }
+
     fun loadMyAccountData(onResult: (Result<MyAccountData>) -> Unit) {
         val current = auth.currentUser
         if (current == null) {
@@ -86,7 +98,8 @@ class FirebaseStatusRepository(
                         }
                         val status = connection.responseCode
                         val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-                        val response = JSONObject(stream?.bufferedReader()?.use { it.readText() }.orEmpty().ifBlank { "{}" })
+                        val responseBody = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                        val response = parseApiJson(responseBody, status, "Account data API")
                         if (status !in 200..299) {
                             Result.failure(IllegalStateException(response.optString("error", "Unable to load account data.")))
                         } else {
@@ -313,7 +326,8 @@ class FirebaseStatusRepository(
                         connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
                         val status = connection.responseCode
                         val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-                        val response = JSONObject(stream?.bufferedReader()?.use { it.readText() }.orEmpty().ifBlank { "{}" })
+                        val responseBody = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                        val response = parseApiJson(responseBody, status, "Enrollment restore API")
                         if (status in 200..299) {
                             context.getSharedPreferences("z3x_device_identity", Context.MODE_PRIVATE)
                                 .edit().putBoolean("is_enrolled", true).putString("owner_uid", current.uid).apply()
@@ -392,7 +406,7 @@ class FirebaseStatusRepository(
                         val status = connection.responseCode
                         val stream = if (status in 200..299) connection.inputStream else connection.errorStream
                         val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-                        val json = JSONObject(body.ifBlank { "{}" })
+                        val json = parseApiJson(body, status, "Device enrollment API")
                         if (status in 200..299) {
                             prefs.edit()
                                 .putBoolean("is_enrolled", true)
