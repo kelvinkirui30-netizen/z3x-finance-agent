@@ -86,7 +86,7 @@ test("company device assignment is staff-controlled and visible only to the assi
 
   const installId = randomUUID();
   const enrolled = await invoke(enrollDevice, admin.token, { code: created.body.code, installId, device, publicKeyPem });
-  assert.equal(enrolled.statusCode, 200);
+  assert.equal(enrolled.statusCode, 200, JSON.stringify(enrolled.body));
 
   const assigned = await invoke(assignDevice, admin.token, { deviceId: installId, customerEmail: customer.email });
   assert.equal(assigned.statusCode, 200);
@@ -113,7 +113,7 @@ test("ordinary customer cannot generate enrollment codes or unlink company devic
   const created = await invoke(createCode, admin.token);
   const installId = randomUUID();
   const enrolled = await invoke(enrollDevice, admin.token, { code: created.body.code, installId, device, publicKeyPem });
-  assert.equal(enrolled.statusCode, 200);
+  assert.equal(enrolled.statusCode, 200, JSON.stringify(enrolled.body));
 
   const deniedUnlink = await invoke(unenrollDevice, customer.token, { installId });
   assert.equal(deniedUnlink.statusCode, 403);
@@ -136,7 +136,7 @@ test("enrollment codes can be revoked only by their staff owner and then cannot 
   const enrollment = await invoke(enrollDevice, owner.token, {
     code: created.body.code, installId: randomUUID(), device, publicKeyPem
   });
-  assert.equal(enrollment.statusCode, 410);
+  assert.equal(enrollment.statusCode, 410, JSON.stringify(enrollment.body));
 });
 
 test("enrollment code generation is rate limited per staff account", async () => {
