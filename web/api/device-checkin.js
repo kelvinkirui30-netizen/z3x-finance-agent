@@ -43,7 +43,7 @@ export default async function handler(req, res) {
       // Temporary compatibility for already-enrolled legacy agents. New
       // enrollments always carry a device key; staff key registration migrates
       // existing records and permanently moves them to signed-device auth.
-      const bearer = String(req.headers.authorization || "").match(/^Bearer\\s+(.+)$/i);
+      const bearer = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i);
       if (!bearer) return send(res, 401, { error: "Legacy device migration requires an authenticated staff session." });
       const user = await auth.verifyIdToken(bearer[1], !process.env.FIRESTORE_EMULATOR_HOST);
       if (deviceRecord.ownerUid !== user.uid) return send(res, 403, { error: "This device is not linked to the signed-in staff account." });
