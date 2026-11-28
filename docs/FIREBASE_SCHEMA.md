@@ -2,94 +2,69 @@
 
 Firebase project: `device-owner-manager`
 
-This is the proposed Firestore contract for the website, Android app and management portal. It is a new schema: the original Supabase test records are intentionally not migrated.
+This is the proposed Firestore contract for the website, Android app and management portal. Supabase test records are intentionally not migrated.
 
 ## Identity and roles
 
-Firebase Authentication is the identity provider. Trusted server code assigns the custom ID token claim `role` with one of:
+Firebase Authentication is the identity provider. Trusted server code assigns the custom ID token claim `role` with one of `super_admin`, `admin`, `assistant`, or `user`. Missing role means `user`. Only trusted server code assigns roles.
 
-- `super_admin`
-- `admin`
-- `assistant`
-- `user` (default when the claim is absent)
-
-Never let a browser or Android client assign its own role. Do not trust a role string stored in a user-editable profile document. The first super-admin must be provisioned through a trusted Admin SDK environment after verifying the account owner.
-
-## Collections
-
-### `users/{uid}`
-
-Profile fields: `displayName`, `email`, `createdAt`, `updatedAt`. Authorization comes from verified Firebase ID token claims, not profile fields.
+## Company-owned device model
 
 ### `devices/{deviceId}`
 
-Server-managed device inventory. Proposed fields:
+The company inventory record is authoritative. Important fields:
 
-- `ownerUid`, `displayName`, `manufacturer`, `model`
-- `androidVersion`, `appVersion`, `managementMode`, `managementCapabilities`
-- `enrollmentStatus`, `enrolledAt`, `lastSeenAt`
-- `batteryLevel`, `appliedPolicyVersion`, `createdAt`, `updatedAt`
+- `ownerUid`: staff account responsible for the company inventory/device-agent provisioning identity; this is not the customer.
+- `assignedCustomerUid`, `assignedCustomerEmail`: customer account receiving the device under a finance agreement.
+- `assignmentStatus`: `unassigned`, `active`, `return_pending`, or `released`.
+- `assignedAt`, `assignedByUid`: assignment audit metadata.
+- `displayName`, `manufacturer`, `model`, `androidVersion`, `appVersion`, `managementMode`, `managementCapabilities`.
+- `enrollmentStatus`, `enrolledAt`, `lastSeenAt`, `batteryLevel`, `appliedPolicyVersion`.
 
-Device credentials/secrets must never be stored in a document readable by browser clients. The Android app must not contain Admin SDK credentials. Its app-specific installation UUID is derived from Android's signing-key-scoped ANDROID_ID; the raw Android ID is never transmitted. This lets the same Firebase account restore an active enrollment after reinstalling the same signed app on the same device. A factory reset or signing-certificate change can create a new identifier. Explicit server-side unlinking remains in force and cannot be undone by reinstalling.
+A customer account is a beneficiary of an assignment, not the owner of the company inventory record. Customer account APIs query `assignedCustomerUid`; staff inventory APIs query `ownerUid`. Customers cannot generate provisioning codes or unlink, transfer, or release a company device.
 
-### `enrollment_codes/{codeId}`
+The current Android agent still uses staff-authenticated enrollment/check-in. A separate device-scoped credential migration is required before a customer can sign in to the app on the same handset without taking over the device's provisioning identity. Do not reuse a customer's Firebase ID token as the company device credential.
 
-Server-only, one-time enrollment records. Store a hash of the code, expiry, intended owner, status, creation metadata and redemption metadata. Never expose raw enrollment codes through collection reads.
+### `enrollment_codes/{codeHash}`
 
-### `device_policies/{deviceId}`
-
-Policy configuration and version metadata. Device and browser clients may read only when authorized. Changes are restricted to staff roles. Policy options must be checked against the Android management mode and actual Android API support before being offered in the console.
-
-### `device_commands/{commandId}`
-
-Audited, short-lived command queue. The initial client-queue allowlist is deliberately limited to non-destructive operations: `request_check_in`, `refresh_policy`, and `display_notice`. Device delivery/results are written by trusted server code. Do not add remote wipe, covert tracking, password extraction/reset, or finance-triggered lock commands to this queue.
+Server-only, one-time provisioning records. Store a hash of the code, expiry, staff `ownerUid`, creator and purpose `company_device_provisioning`. Plaintext is returned once. Only Admin/Super Admin can create or revoke codes; normal users cannot.
 
 ### `device_installments/{installmentId}`
 
-Finance schedule fields: `deviceId`, `ownerUid`, `label`, `amountMinor` (integer minor currency units), `currencyCode` (for example `KES`), `dueDate`, `notes`, `createdAt`, `updatedAt`.
+Finance schedule fields: `deviceId`, `ownerUid` (staff/company record owner), `customerUid` (assigned customer), `label`, `amountMinor` (integer minor currency units), `currencyCode`, `dueDate`, `notes`, timestamps.
 
 ### `device_installment_payments/{paymentId}`
 
-Append-only payment records: `installmentId`, `ownerUid`, `amountMinor`, `currencyCode`, `paidAt`, `reference`, `notes`, `createdAt`. Use integer minor units, not floating-point currency values.
+Append-only payment records: `installmentId`, `ownerUid`, `customerUid`, `amountMinor`, `currencyCode`, `paidAt`, `reference`, `notes`, timestamps.
 
-### `device_finance_actions/{actionId}`
+### `device_release_approvals/{approvalId}`
 
-Append-only finance review record: `deviceId`, `ownerUid`, optional `installmentId`, `type: "payment_review"`, `decision: "approved" | "declined"`, `reason`, `recordedBy`, `createdAt`. This records a human decision; it does not send device-control commands.
+Reserved for the forthcoming release workflow. A release must require a settled finance agreement, a separate authorized approval, a server-side decision record and a device-scoped release authorization. The direct unlink endpoint is disabled until this workflow is implemented.
+
+## Other collections
+
+### `users/{uid}`
+Profile fields such as `displayName`, `email`, `createdAt`, and `updatedAt`. Authorization comes from verified token claims, not editable profile fields.
+
+### `device_policies/{deviceId}`
+Policy configuration and version metadata. Changes are staff-restricted and must be checked against actual Android API and management-mode support.
+
+### `device_commands/{commandId}`
+Audited, short-lived command queue. Current allowlist is limited to non-destructive operations such as `request_check_in`, `refresh_policy`, and `display_notice`. Do not add covert tracking, credential extraction, remote wipe, or finance-triggered phone restrictions.
 
 ### `audit_logs/{logId}`
-
-Server-written append-only events: actor UID and role, event type, target type/ID, timestamp, outcome and a minimal metadata map. Do not log passwords, raw enrollment codes, device secrets or private tokens.
-
-### `device_locations/{locationId}`
-
-Optional location history. Only implement when the device user has been clearly informed and has granted the required Android permissions. Read access is limited to the device owner and authorized staff; writes are server-mediated.
+Server-written audit events. Never log passwords, raw provisioning codes, device credentials or private signing keys.
 
 ## Security model
 
-- Browser and Android apps use Firebase client SDKs and Firebase Authentication.
-- Device enrollment, check-in and command delivery are mediated by trusted HTTPS server endpoints. The Android app never receives a Firebase Admin key.
-- Firestore rules deny direct client writes to device identity/status, enrollment codes, device check-ins, command delivery results, audit logs and location history.
-- Admin access uses verified custom claims. A trusted Admin SDK process is required to set claims.
-- The initial command allowlist excludes destructive device operations. Finance records never automatically cause device restrictions.
-- Apply App Check where supported, validate every server request, rate-limit enrollment attempts, expire one-time codes, and rotate/revoke device credentials when a device is unenrolled.
+- Device enrollment and check-in are mediated by trusted HTTPS APIs.
+- The Android app never contains Firebase Admin credentials or server signing keys.
+- Device inventory and assignment are server-managed; clients cannot write owner or assignment fields.
+- Customer account data is read by `assignedCustomerUid`; staff inventory is read by `ownerUid`.
+- Direct device unlink is disabled. A later release workflow must require settled finance and an independent approval.
+- Commands must be device-scoped, authenticated, short-lived, replay-resistant and auditable.
+- Apply App Check where compatible, validate every request, rate-limit provisioning, and rotate/revoke device credentials when a device is formally released.
 
 ## Deploying rules and indexes
 
-The repository is configured for project `device-owner-manager` in `.firebaserc`.
-
-After reviewing the project in Firebase Console and installing Firebase CLI in a trusted development environment, deploy with:
-
-```bash
-firebase use device-owner-manager
-firebase deploy --only firestore:rules,firestore:indexes
-```
-
-A successful GitHub commit does **not** deploy rules to Firebase. Deployment requires an authenticated Firebase CLI session or a separately configured, tightly scoped CI identity.
-
-## Important implementation notes
-
-1. Confirm the Firebase project's Firestore database exists and choose its location before first production use; the location choice cannot be changed later.
-2. The current Android starter has package ID `com.dom.manager`; the original Android project uses `com.sentinel.deviceowner`. Firebase Android app registration/package configuration must be checked before merging source.
-3. The original web source contains Supabase client and server integrations. Replace those with Firebase Authentication and Firestore client/server modules; do not merely remove the dependency.
-4. The original SQL migration references a pre-existing `devices` table not defined in that migration. The collection contract above is therefore a proposed new model, not a claim that the old schema is complete.
-5. Firebase Cloud Functions deployment may require the Blaze billing plan. We should first determine the existing hosting runtime for the website's server endpoints and select the lowest-cost secure server option before deploying privileged APIs.
+The repository is configured for project `device-owner-manager`. Firestore rules remain a separate deployment step and must be tested and reviewed before production deployment.

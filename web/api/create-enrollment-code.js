@@ -7,6 +7,7 @@ const PROJECT_ID = process.env.FIRESTORE_EMULATOR_HOST
   ? (process.env.FIREBASE_PROJECT_ID || "device-owner-manager")
   : "device-owner-manager";
 const ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+const STAFF_ROLES = new Set(["super_admin", "admin"]);
 
 function send(res, status, body) {
   res.setHeader("Cache-Control", "no-store");
@@ -39,9 +40,12 @@ export default async function handler(req, res) {
   }
   try {
     const { auth, db } = services();
-    const match = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i);
+    const match = String(req.headers.authorization || "").match(/^Bearer\\s+(.+)$/i);
     if (!match) return send(res, 401, { error: "Sign in is required." });
     const user = await auth.verifyIdToken(match[1], !process.env.FIRESTORE_EMULATOR_HOST);
+    if (!STAFF_ROLES.has(user.role || "user")) {
+      return send(res, 403, { error: "Only Admin or Super Admin can prepare company-device enrollment." });
+    }
     const code = newCode();
     const codeHash = hashCode(code);
     const now = Timestamp.now();
@@ -59,6 +63,8 @@ export default async function handler(req, res) {
       tx.create(codeRef, {
         ownerUid: user.uid,
         ownerEmail: user.email || "",
+        createdByUid: user.uid,
+        purpose: "company_device_provisioning",
         status: "pending",
         createdAt: FieldValue.serverTimestamp(),
         expiresAt

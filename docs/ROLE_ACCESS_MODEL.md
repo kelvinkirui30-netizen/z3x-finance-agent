@@ -2,52 +2,32 @@
 
 ## Roles
 
-The portal has exactly four application roles, stored as Firebase Authentication custom claims:
+| Role | Authority |
+|---|---|
+| `super_admin` | Sole authority to promote/demote staff, assign Admin/Assistant roles and manage system-wide settings |
+| `admin` | Manage authorized company devices, assign customers, manage permitted finance records and support workflows |
+| `assistant` | Limited support access; no staff-role management, device assignment, unlinking or privileged finance writes |
+| `user` | Customer self-service: own profile, devices assigned to their account and own finance records |
 
-| Role claim | Portal area | Authority |
-|---|---|---|
-| `super_admin` | Super Admin | Sole authority to promote/demote staff, assign Admin or Assistant roles, and manage system-wide settings |
-| `admin` | Admin | Manage permitted user, device, policy and finance records; cannot change staff roles |
-| `assistant` | Assistant | Support access; read authorized operational records; no staff-role management or privileged policy/command/finance writes |
-| `user` | User | Self-service access to own profile, own devices and own finance records only |
+A missing role claim is always treated as a normal customer account.
 
-A missing `role` claim is treated as a normal user. It must never be treated as staff.
+## Company device ownership and assignment
+
+- Company device inventory remains owned by the Z3X organization; the device record's `ownerUid` identifies its staff provisioning owner, not its financed customer.
+- Only Admin/Super Admin can create company-device provisioning codes.
+- Only Admin/Super Admin can assign an already-enrolled company device to an existing normal customer account by verified Firebase email.
+- A customer cannot assign, transfer, unlink or release a device.
+- An active assignment cannot be overwritten. It must pass a future return/release workflow first.
+- Customer account data is queried by `assignedCustomerUid`; staff inventory is queried by `ownerUid`.
+- The Android agent's current check-in identity remains staff-authenticated. Device-scoped credentials are a separate required migration before customer app sign-in is enabled on a financed handset.
+
+## Release and unlink
+
+The old direct unlink operation is disabled. The forthcoming release process must verify a fully settled finance agreement, obtain an independent authorized approval, create an immutable audit event, and issue a short-lived device-specific release authorization. No customer account can trigger release.
 
 ## Role assignment and approval
 
-- Google/Firebase sign-in establishes identity only; it does not grant a staff role.
-- New accounts receive normal-user access by default.
-- Only a trusted server process may set or change the custom `role` claim.
-- Only the Super Admin may request Admin or Assistant promotion/demotion.
-- The browser must never write a role claim or a trusted role field to Firestore.
-- Role changes must be recorded in an append-only audit event by trusted server code.
-- The first Super Admin must be bootstrapped out-of-band using Firebase Admin SDK after verifying the project owner's account UID. Do not put service-account keys in GitHub, Vercel browser variables, or chat.
-
-## Firestore authorization
-
-The rules in `firestore.rules` implement the base separation:
-- Normal users can read their own records only.
-- Staff can read operational records according to their role.
-- Only Admin and Super Admin can perform the specified privileged policy, command-queue and finance-review writes.
-- Assistants are read/support-only for those privileged collections.
-- Only Super Admin can delete protected records.
-- Device inventory, enrollment codes, device check-ins, audit logs and location writes remain server-managed.
-- Client-queued device requests remain limited to non-destructive, user-visible operations.
-
-## Implementation status
-
-The portal has role-aware navigation, a normal-user self-service view, account/staff tables, and a Firebase Admin SDK endpoint for staff account operations.
-
-Phase 1 hardening now includes:
-- Server-verified Firebase ID tokens and custom role claims on the account API.
-- Admin and Super Admin access to the paginated account directory; Assistants are denied access to the full directory.
-- Super Admin-only role/status changes, protected Super Admin accounts, self-change prevention, input validation and audit event writes.
-- Firestore rules restrict finance record reads to Admin/Super Admin and the record owner; profile display-name writes are constrained; policy document IDs must match their device IDs.
-
-Important remaining work:
-- Automated Firebase Emulator tests for all four roles and cross-account access.
-- App Check/rate-limiting and complete API security review.
-- Review and test bootstrap recovery and audit failure handling.
-- Firestore rules have NOT been deployed to Firebase. Do not deploy production rules until tests pass and the project data model has been reviewed.
-- A GitHub commit does not prove a Vercel production deployment or successful CI build. Confirm the dedicated Web Portal workflow and Android APK workflow separately.
-- Finance data remains display-only; no payments are initiated by the portal.
+- Sign-in establishes identity only; it does not grant staff role.
+- Only trusted server code sets custom role claims.
+- Only Super Admin can promote/demote Admin and Assistant.
+- All privileged changes require server-side authorization and audit events.

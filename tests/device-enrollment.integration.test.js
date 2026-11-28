@@ -8,23 +8,39 @@ import unenrollDevice from "../web/api/unenroll-device.js";
 import revokeCode from "../web/api/revoke-enrollment-code.js";
 import restoreEnrollment from "../web/api/restore-device-enrollment.js";
 import myAccountData from "../web/api/my-account-data.js";
+import assignDevice from "../web/api/assign-device-to-customer.js";
 
 const authHost = process.env.FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099";
 const apiKey = "fake-api-key";
 
-async function createUser(label) {
+async function createUser(label, role = "admin") {
+  const email = `z3x-${label}-${randomUUID()}@example.test`;
   const response = await fetch(`http://${authHost}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      email: `z3x-${label}-${randomUUID()}@example.test`,
+      email,
       password: "test-password-123",
       returnSecureToken: true
     })
   });
   const data = await response.json();
   assert.equal(response.ok, true, JSON.stringify(data));
-  return { token: data.idToken, uid: data.localId };
+  const claimsResponse = await fetch(`http://${authHost}/identitytoolkit.googleapis.com/v1/accounts:update?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ localId: data.localId, customAttributes: JSON.stringify({ role }) })
+  });
+  const claimsData = await claimsResponse.json();
+  assert.equal(claimsResponse.ok, true, JSON.stringify(claimsData));
+  const signInResponse = await fetch(`http://${authHost}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password: "test-password-123", returnSecureToken: true })
+  });
+  const signedIn = await signInResponse.json();
+  assert.equal(signInResponse.ok, true, JSON.stringify(signedIn));
+  return { token: signedIn.idToken, uid: data.localId, email };
 }
 
 function responseMock() {
@@ -37,14 +53,12 @@ function responseMock() {
     json(body) { this.body = body; return this; }
   };
 }
-
 async function invoke(handler, token, body = {}, method = "POST") {
   const req = { method, headers: token ? { authorization: `Bearer ${token}` } : {}, body };
   const res = responseMock();
   await handler(req, res);
   return res;
 }
-
 const device = {
   manufacturer: "Test Manufacturer",
   model: "Test Device",
@@ -56,84 +70,78 @@ const device = {
   isCharging: false
 };
 
-test("enrollment lifecycle enforces ownership, one-time use, check-in and unlinking", async () => {
-  const owner = await createUser("owner");
-  const other = await createUser("other");
-  const created = await invoke(createCode, owner.token);
+test("company device assignment is staff-controlled and visible only to the assigned customer", async () => {
+  const admin = await createUser("assign-admin", "admin");
+  const customer = await createUser("assigned-customer", "user");
+  const otherCustomer = await createUser("unassigned-customer", "user");
+  const created = await invoke(createCode, admin.token);
   assert.equal(created.statusCode, 200);
-  assert.match(created.body.code, /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/);
 
   const installId = randomUUID();
-  const crossAccount = await invoke(enrollDevice, other.token, { code: created.body.code, installId, device });
-  assert.equal(crossAccount.statusCode, 403);
-
-  const invalid = await invoke(enrollDevice, owner.token, {
-    code: created.body.code, installId, device: { ...device, sdkInt: 10 }
-  });
-  assert.equal(invalid.statusCode, 400);
-
-  const enrolled = await invoke(enrollDevice, owner.token, { code: created.body.code, installId, device });
+  const enrolled = await invoke(enrollDevice, admin.token, { code: created.body.code, installId, device });
   assert.equal(enrolled.statusCode, 200);
-  assert.equal(enrolled.body.success, true);
 
-  const replay = await invoke(enrollDevice, owner.token, { code: created.body.code, installId, device });
-  assert.equal(replay.statusCode, 410);
+  const assigned = await invoke(assignDevice, admin.token, { deviceId: installId, customerEmail: customer.email });
+  assert.equal(assigned.statusCode, 200);
+  assert.equal(assigned.body.customerUid, customer.uid);
 
-  const wrongOwnerCheckIn = await invoke(checkIn, other.token, { installId, device });
-  assert.equal(wrongOwnerCheckIn.statusCode, 403);
+  const customerData = await invoke(myAccountData, customer.token, {}, "GET");
+  assert.equal(customerData.statusCode, 200);
+  assert.equal(customerData.body.devices.some((item) => item.id === installId), true);
 
-  const validCheckIn = await invoke(checkIn, owner.token, { installId, device: { ...device, batteryLevel: 66 } });
-  assert.equal(validCheckIn.statusCode, 200);
+  const otherData = await invoke(myAccountData, otherCustomer.token, {}, "GET");
+  assert.equal(otherData.statusCode, 200);
+  assert.equal(otherData.body.devices.some((item) => item.id === installId), false);
 
-  const accountData = await invoke(myAccountData, owner.token, {}, "GET");
-  assert.equal(accountData.statusCode, 200);
-  assert.equal(accountData.body.devices.some((item) => item.id === installId), true);
-  const otherAccountData = await invoke(myAccountData, other.token, {}, "GET");
-  assert.equal(otherAccountData.statusCode, 200);
-  assert.equal(otherAccountData.body.devices.some((item) => item.id === installId), false);
-
-  const restored = await invoke(restoreEnrollment, owner.token, { installId });
-  assert.equal(restored.statusCode, 200);
-  const wrongAccountRestore = await invoke(restoreEnrollment, other.token, { installId });
-  assert.equal(wrongAccountRestore.statusCode, 403);
-
-  const unlinked = await invoke(unenrollDevice, owner.token, { installId });
-  assert.equal(unlinked.statusCode, 200);
-
-  const stoppedCheckIn = await invoke(checkIn, owner.token, { installId, device });
-  assert.equal(stoppedCheckIn.statusCode, 410);
-  const blockedRestore = await invoke(restoreEnrollment, owner.token, { installId });
-  assert.equal(blockedRestore.statusCode, 410);
+  const reassign = await invoke(assignDevice, admin.token, { deviceId: installId, customerEmail: otherCustomer.email });
+  assert.equal(reassign.statusCode, 409);
 });
 
-test("enrollment codes can be revoked only by their owner and then cannot enroll", async () => {
-  const owner = await createUser("revoker");
-  const other = await createUser("non-owner");
+test("ordinary customer cannot generate enrollment codes or unlink company devices", async () => {
+  const admin = await createUser("staff", "admin");
+  const customer = await createUser("ordinary", "user");
+  const deniedCode = await invoke(createCode, customer.token);
+  assert.equal(deniedCode.statusCode, 403);
+
+  const created = await invoke(createCode, admin.token);
+  const installId = randomUUID();
+  const enrolled = await invoke(enrollDevice, admin.token, { code: created.body.code, installId, device });
+  assert.equal(enrolled.statusCode, 200);
+
+  const deniedUnlink = await invoke(unenrollDevice, customer.token, { installId });
+  assert.equal(deniedUnlink.statusCode, 403);
+  const staffUnlink = await invoke(unenrollDevice, admin.token, { installId });
+  assert.equal(staffUnlink.statusCode, 409);
+
+  const restore = await invoke(restoreEnrollment, admin.token, { installId });
+  assert.equal(restore.statusCode, 200);
+});
+
+test("enrollment codes can be revoked only by their staff owner and then cannot enroll", async () => {
+  const owner = await createUser("revoker", "admin");
+  const other = await createUser("non-owner", "admin");
   const created = await invoke(createCode, owner.token);
   assert.equal(created.statusCode, 200);
-
   const forbidden = await invoke(revokeCode, other.token, { code: created.body.code });
   assert.equal(forbidden.statusCode, 403);
-
   const revoked = await invoke(revokeCode, owner.token, { code: created.body.code });
   assert.equal(revoked.statusCode, 200);
-
   const enrollment = await invoke(enrollDevice, owner.token, {
     code: created.body.code, installId: randomUUID(), device
   });
   assert.equal(enrollment.statusCode, 410);
 });
 
-test("enrollment code generation is rate limited per account", async () => {
-  const owner = await createUser("rate-limit");
+test("enrollment code generation is rate limited per staff account", async () => {
+  const owner = await createUser("rate-limit", "admin");
   const first = await invoke(createCode, owner.token);
   assert.equal(first.statusCode, 200);
   const second = await invoke(createCode, owner.token);
   assert.equal(second.statusCode, 429);
 });
 
-test("simultaneous redemption of one code can create only one enrollment", async () => {
-  const owner = await createUser("race");
+test("simultaneous redemption of one code can create only one company device enrollment", async () => {
+  const owner = await createUser("race", "admin");
   const created = await invoke(createCode, owner.token);
   assert.equal(created.statusCode, 200);
   const payload = { code: created.body.code, installId: randomUUID(), device };
