@@ -5,8 +5,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getApps, initializeApp } from "firebase-admin/app";
 import createCommand from "../api/create-device-command.js";
-import fetchCommands from "../api/fetch-device-commands.js";
-import completeCommand from "../api/complete-device-command.js";
+import { fetchDeviceCommands as fetchCommands, completeDeviceCommand as completeCommand } from "../api/device-commands.js";
 
 const projectId = process.env.FIREBASE_PROJECT_ID || "demo-z3x-finance-agent";
 const authHost = process.env.FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099";

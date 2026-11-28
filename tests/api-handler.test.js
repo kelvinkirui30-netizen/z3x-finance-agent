@@ -10,8 +10,7 @@ const endpoints = [
   ["restore device enrollment", "../web/api/restore-device-enrollment.js"],
   ["my account data", "../web/api/my-account-data.js", "GET"],
   ["create device command", "../web/api/create-device-command.js"],
-  ["fetch device commands", "../web/api/fetch-device-commands.js"],
-  ["complete device command", "../web/api/complete-device-command.js"]
+  ["combined device command API", "../web/api/device-commands.js"]
 ];
 
 function mockResponse() {
@@ -30,7 +29,7 @@ for (const [name, path, allowedMethod = "POST"] of endpoints) {
     const module = await import(path);
     assert.equal(typeof module.default, "function");
 
-    const req = { method: allowedMethod === "GET" ? "POST" : "GET", headers: {} };
+    const req = { method: allowedMethod === "GET" ? "POST" : "GET", headers: {}, query: {} };
     const res = mockResponse();
     await module.default(req, res);
 

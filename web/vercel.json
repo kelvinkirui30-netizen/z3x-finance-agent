@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/fetch-device-commands",
+      "destination": "/api/device-commands?action=fetch"
+    },
+    {
+      "source": "/api/complete-device-command",
+      "destination": "/api/device-commands?action=complete"
+    }
+  ]
+}
