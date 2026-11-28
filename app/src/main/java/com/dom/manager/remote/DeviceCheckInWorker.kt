@@ -3,7 +3,7 @@ package com.dom.manager.remote
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import android.util.Base64
+import com.google.android.gms.tasks.Tasks
 import com.dom.manager.BuildConfig
 import com.dom.manager.device.DeviceStatusRepository
 import com.google.firebase.auth.FirebaseAuth
@@ -43,7 +43,7 @@ class DeviceCheckInWorker(appContext: Context, params: WorkerParameters) : Corou
             if (!prefs.getBoolean("device_key_registered", false)) {
                 val user = FirebaseAuth.getInstance().currentUser
                     ?: run { recordError(prefs, "This device needs staff-assisted credential setup. Sign in with an authorized staff account."); return Result.retry() }
-                val token = user.getIdToken(true).awaitToken()
+                val token = Tasks.await(user.getIdToken(true)).token ?: throw IllegalStateException("Missing staff token.")
                 val registered = post(
                     "/api/register-device-key",
                     JSONObject().put("installId", installId).put("publicKeyPem", DeviceKeyStore.publicKeyPem(installId)),
@@ -116,15 +116,6 @@ class DeviceCheckInWorker(appContext: Context, params: WorkerParameters) : Corou
         }
         return canonical(value)
     }
-
-    private suspend fun com.google.android.gms.tasks.Task<com.google.firebase.auth.GetTokenResult>.awaitToken(): String =
-        kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
-            addOnSuccessListener { result ->
-                val token = result.token
-                if (token.isNullOrBlank()) continuation.resumeWith(Result.failure(IllegalStateException("Missing staff token.")))
-                else continuation.resumeWith(Result.success(token))
-            }.addOnFailureListener { continuation.resumeWith(Result.failure(it)) }
-        }
 
     private fun recordError(prefs: android.content.SharedPreferences, message: String) {
         prefs.edit().putString("last_checkin_error", message).apply()

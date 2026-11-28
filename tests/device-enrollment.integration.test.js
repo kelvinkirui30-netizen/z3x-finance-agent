@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { randomUUID, generateKeyPairSync } from "node:crypto";
 import createCode from "../web/api/create-enrollment-code.js";
+import deviceChallenge from "../web/api/device-challenge.js";
+import { deviceSignatureMessage } from "../web/api/device-checkin.js";
 import enrollDevice from "../web/api/enroll-device.js";
 import checkIn from "../web/api/device-checkin.js";
 import unenrollDevice from "../web/api/unenroll-device.js";
@@ -61,6 +63,9 @@ async function invoke(handler, token, body = {}, method = "POST") {
   await handler(req, res);
   return res;
 }
+const keyPair = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+const publicKeyPem = keyPair.publicKey.export({ type: "spki", format: "pem" }).toString();
+
 const device = {
   manufacturer: "Test Manufacturer",
   model: "Test Device",
@@ -80,7 +85,7 @@ test("company device assignment is staff-controlled and visible only to the assi
   assert.equal(created.statusCode, 200);
 
   const installId = randomUUID();
-  const enrolled = await invoke(enrollDevice, admin.token, { code: created.body.code, installId, device });
+  const enrolled = await invoke(enrollDevice, admin.token, { code: created.body.code, installId, device, publicKeyPem });
   assert.equal(enrolled.statusCode, 200);
 
   const assigned = await invoke(assignDevice, admin.token, { deviceId: installId, customerEmail: customer.email });
@@ -107,7 +112,7 @@ test("ordinary customer cannot generate enrollment codes or unlink company devic
 
   const created = await invoke(createCode, admin.token);
   const installId = randomUUID();
-  const enrolled = await invoke(enrollDevice, admin.token, { code: created.body.code, installId, device });
+  const enrolled = await invoke(enrollDevice, admin.token, { code: created.body.code, installId, device, publicKeyPem });
   assert.equal(enrolled.statusCode, 200);
 
   const deniedUnlink = await invoke(unenrollDevice, customer.token, { installId });
@@ -129,7 +134,7 @@ test("enrollment codes can be revoked only by their staff owner and then cannot 
   const revoked = await invoke(revokeCode, owner.token, { code: created.body.code });
   assert.equal(revoked.statusCode, 200);
   const enrollment = await invoke(enrollDevice, owner.token, {
-    code: created.body.code, installId: randomUUID(), device
+    code: created.body.code, installId: randomUUID(), device, publicKeyPem
   });
   assert.equal(enrollment.statusCode, 410);
 });
@@ -146,7 +151,7 @@ test("simultaneous redemption of one code can create only one company device enr
   const owner = await createUser("race", "admin");
   const created = await invoke(createCode, owner.token);
   assert.equal(created.statusCode, 200);
-  const payload = { code: created.body.code, installId: randomUUID(), device };
+  const payload = { code: created.body.code, installId: randomUUID(), device, publicKeyPem };
   const results = await Promise.all([
     invoke(enrollDevice, owner.token, payload),
     invoke(enrollDevice, owner.token, payload)
