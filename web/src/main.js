@@ -203,9 +203,8 @@ if (missing.length) {
         document.querySelectorAll(".view").forEach((view) => view.classList.add("hidden"));
         $("#view-user-home").classList.remove("hidden");
         $("#page-title").textContent = "My account";
-        await loadPersonalDashboard(db, user);
-        $("#refresh-my-data").onclick = () => loadPersonalDashboard(db, user);
-        wireEnrollmentCode(user, db);
+        await loadPersonalDashboard(user);
+        $("#refresh-my-data").onclick = () => loadPersonalDashboard(user);
       } else {
         await loadDashboard();
         wireNavigation(db);
@@ -260,8 +259,15 @@ async function loadDashboard() {
     $("#m-compliant").textContent = devices.filter((d) => d.complianceStatus === "compliant").length;
     $("#m-policies").textContent = policies.filter((p) => p.enabled !== false).length;
     $("#nav-device-count").textContent = devices.length;
-    const deviceRows = devices.length ? devices.map((d) => '<tr><td><b>' + escapeHtml(d.displayName || d.deviceName || "Unnamed device") + '</b><span class="subline">' + escapeHtml([d.manufacturer, d.model].filter(Boolean).join(" ")) + '</span></td><td>' + escapeHtml(d.model || "—") + '</td><td>' + pill(d.enrollmentStatus) + '</td><td>' + (Number.isFinite(d.batteryLevel) ? escapeHtml(d.batteryLevel) + "%" : "—") + '</td><td>' + date(d.lastSeenAt) + "</td></tr>").join("") : '<tr><td colspan="5" class="empty">No device records are available to this account.</td></tr>';
+    const deviceRows = devices.length ? devices.map((d) => '<tr><td><b>' + escapeHtml(d.displayName || d.deviceName || "Unnamed device") + '</b><span class="subline">' + escapeHtml([d.manufacturer, d.model].filter(Boolean).join(" ")) + '</span></td><td>' + escapeHtml(d.model || "—") + '</td><td>' + pill(d.enrollmentStatus) + '</td><td>' + pill(d.assignmentStatus || "unassigned") + '</td><td>' + (Number.isFinite(d.batteryLevel) ? escapeHtml(d.batteryLevel) + "%" : "—") + '</td><td>' + date(d.lastSeenAt) + "</td></tr>").join("") : '<tr><td colspan="6" class="empty">No device records are available to this account.</td></tr>';
     $("#device-rows").innerHTML = deviceRows;
+    const assignSelect = $("#assign-device-id");
+    if (assignSelect) {
+      const assignable = devices.filter((d) => d.enrollmentStatus === "enrolled" && d.assignmentStatus !== "active");
+      assignSelect.innerHTML = '<option value="">Choose an unassigned enrolled device</option>' +
+        assignable.map((d) => '<option value="' + escapeHtml(d.id) + '">' + escapeHtml(d.displayName || d.model || d.id) + '</option>').join("");
+      assignSelect.disabled = assignable.length === 0;
+    }
     $("#compliance-rows").innerHTML = devices.length ? devices.map((d) => '<tr><td>' + escapeHtml(d.displayName || d.deviceName || "Unnamed device") + '</td><td>' + pill(d.enrollmentStatus) + '</td><td>' + pill(d.complianceStatus) + '</td><td>' + date(d.lastSeenAt) + '</td></tr>').join("") : '<tr><td colspan="4" class="empty">No device records available.</td></tr>';
     const activityHtml = activities.length ? activities.map((a) => '<div class="activity-row"><b>' + escapeHtml(a.action || "Activity") + '</b><span class="subline">' + escapeHtml(a.actorEmail || "Administrator") + " · " + date(a.createdAt) + "</span></div>").join("") : "No activity recorded yet.";
     $("#activity-preview").innerHTML = activityHtml;
@@ -277,41 +283,32 @@ function showToast(message) {
 }
 
 
-async function loadPersonalDashboard(db, user) {
-  const readOwnCollection = async (name) => {
-    try {
-      return await getDocs(query(collection(db, name), where("ownerUid", "==", user.uid)));
-    } catch (error) {
-      console.warn("Personal collection unavailable:", name, error?.code || error);
-      return { size: 0, docs: [], unavailable: true };
-    }
-  };
-  const [devices, schedules, payments] = await Promise.all([
-    readOwnCollection("devices"),
-    readOwnCollection("device_installments"),
-    readOwnCollection("device_installment_payments")
-  ]);
-  const restricted = [devices, schedules, payments].some((snapshot) => snapshot.unavailable);
+async function loadPersonalDashboard(user) {
   const warning = $("#my-data-warning");
-  if (warning) {
-    warning.classList.toggle("hidden", !restricted);
-    warning.textContent = restricted
-      ? "Some personal records are not available yet. You can still use the portal and generate a device enrollment code."
-      : "";
+  try {
+    const token = await user.getIdToken();
+    const response = await fetch("/api/my-account-data", { headers: { Authorization: "Bearer " + token } });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Unable to load your account data.");
+    const devices = result.devices || [];
+    const schedules = result.installments || [];
+    const payments = result.payments || [];
+    if (warning) { warning.classList.add("hidden"); warning.textContent = ""; }
+    $("#my-device-count").textContent = devices.length;
+    $("#my-schedule-count").textContent = schedules.length;
+    $("#my-payment-count").textContent = payments.length;
+    $("#my-role").textContent = "User";
+    $("#my-device-list").innerHTML = devices.length
+      ? devices.map((d) => '<div class="activity-row"><b>' + escapeHtml(d.displayName || d.model || "Assigned device") + '</b><span class="subline">Status: ' + escapeHtml(d.enrollmentStatus || "Not reported") + ' · Assignment: ' + escapeHtml(d.assignmentStatus || "active") + ' · Access: ' + escapeHtml(d.managementMode || "Unknown") + '</span><span class="subline">' + escapeHtml([d.manufacturer, d.model, d.androidVersion ? "Android " + d.androidVersion : ""].filter(Boolean).join(" · ")) + '</span><span class="subline">' + (Number.isFinite(d.batteryLevel) ? "Battery: " + escapeHtml(d.batteryLevel) + "%" + (d.isCharging ? " · Charging" : "") : "Battery: not reported") + '</span><span class="subline">Last seen: ' + date(d.lastSeenAt) + '</span></div>').join("")
+      : "No company devices have been assigned to your account yet. Contact Z3X customer care if you believe this is incorrect.";
+    const financeRows = schedules.map((d) => '<div class="activity-row"><b>' + escapeHtml(d.label || "Finance schedule") + '</b><span class="subline">' + escapeHtml(d.currencyCode || "KES") + " " + escapeHtml(d.amountMinor ?? "—") + '</span><span class="subline">Due: ' + date(d.dueDate) + '</span></div>')
+      .concat(payments.map((d) => '<div class="activity-row"><b>Payment record</b><span class="subline">' + escapeHtml(d.currencyCode || "KES") + " " + escapeHtml(d.amountMinor ?? "—") + '</span><span class="subline">Paid: ' + date(d.paidAt) + '</span></div>'));
+    $("#my-finance-list").innerHTML = financeRows.length ? financeRows.join("") : "No finance records are available yet.";
+  } catch (error) {
+    if (warning) { warning.classList.remove("hidden"); warning.textContent = error.message || "Unable to load your account data."; }
+    $("#my-device-list").textContent = "Assigned device information is temporarily unavailable.";
+    $("#my-finance-list").textContent = "Finance information is temporarily unavailable.";
   }
-  $("#my-device-count").textContent = devices.size;
-  $("#my-schedule-count").textContent = schedules.size;
-  $("#my-payment-count").textContent = payments.size;
-  $("#my-role").textContent = "User";
-  const deviceData = devices.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  $("#my-device-list").innerHTML = deviceData.length
-    ? deviceData.map((d) => '<div class="activity-row"><b>' + escapeHtml(d.displayName || d.deviceName || d.model || "Registered device") + '</b><span class="subline">Status: ' + escapeHtml(d.enrollmentStatus || "Not reported") + ' · Access: ' + escapeHtml(d.managementMode || "Unknown") + '</span><span class="subline">' + escapeHtml([d.manufacturer, d.model, d.androidVersion ? "Android " + d.androidVersion : ""].filter(Boolean).join(" · ")) + '</span><span class="subline">' + (Number.isFinite(d.batteryLevel) ? "Battery: " + escapeHtml(d.batteryLevel) + "%" + (d.isCharging ? " · Charging" : "") : "Battery: not reported") + '</span><span class="subline">Last seen: ' + date(d.lastSeenAt) + '</span>' + (d.enrollmentStatus === "enrolled" ? '<button class="btn secondary" type="button" data-unenroll-device="' + escapeHtml(d.id) + '">Unlink device</button>' : '') + '</div>').join("")
-    : "No devices are linked to your account yet.";
-  const scheduleData = schedules.docs.map((d) => d.data());
-  const paymentData = payments.docs.map((d) => d.data());
-  const financeRows = scheduleData.map((d) => '<div class="activity-row"><b>Schedule</b><span class="subline">' + escapeHtml(d.currencyCode || "") + " " + escapeHtml(d.amountMinor ?? "—") + '</span></div>')
-    .concat(paymentData.map((d) => '<div class="activity-row"><b>Payment record</b><span class="subline">' + escapeHtml(d.currencyCode || "") + " " + escapeHtml(d.amountMinor ?? "—") + '</span></div>'));
-  $("#my-finance-list").innerHTML = financeRows.length ? financeRows.join("") : "No finance records are available yet.";
 }
 
 async function staffApi(method = "GET", body, pageToken) {
@@ -385,6 +382,39 @@ function wireAdminTools() {
       button.disabled = false;
     }
   });
+  const assignButton = $("#assign-device-submit");
+  if (assignButton && !assignButton.dataset.wired) {
+    assignButton.dataset.wired = "1";
+    assignButton.addEventListener("click", async () => {
+      const deviceId = $("#assign-device-id").value;
+      const customerEmail = $("#assign-customer-email").value.trim();
+      const message = $("#assign-device-message");
+      if (!deviceId || !customerEmail) {
+        message.textContent = "Choose an enrolled device and enter the customer's registered email.";
+        return;
+      }
+      assignButton.disabled = true;
+      message.textContent = "Verifying customer account and assigning device…";
+      try {
+        const token = await signedInUser.getIdToken();
+        const response = await fetch("/api/assign-device-to-customer", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceId, customerEmail })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Device assignment failed.");
+        message.textContent = result.message;
+        $("#assign-customer-email").value = "";
+        await loadDashboard();
+        showToast("Device assigned to " + result.customerEmail);
+      } catch (error) {
+        message.textContent = error.message || "Device assignment failed.";
+      } finally {
+        assignButton.disabled = false;
+      }
+    });
+  }
   $("#refresh-users")?.addEventListener("click", loadAccounts);
   $("#refresh-staff")?.addEventListener("click", () => loadAccounts());
   $("#load-more-accounts")?.addEventListener("click", () => loadAccounts({ append: true }));
@@ -445,33 +475,7 @@ function wireNavigation(db) {
 
 
 function wireEnrollmentCode(user, db) {
-  const deviceList = $("#my-device-list");
-  if (deviceList && !deviceList.dataset.unenrollWired) {
-    deviceList.dataset.unenrollWired = "1";
-    deviceList.addEventListener("click", async (event) => {
-      const action = event.target.closest("[data-unenroll-device]");
-      if (!action) return;
-      const installId = action.dataset.unenrollDevice;
-      if (!installId || !window.confirm("Unlink this device from your account? Check-ins will stop. Its existing records will be retained.")) return;
-      action.disabled = true;
-      try {
-        const token = await user.getIdToken();
-        const response = await fetch("/api/unenroll-device", {
-          method: "POST",
-          headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-          body: JSON.stringify({ installId })
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || "Could not unlink this device.");
-        showToast(result.message || "Device unlinked.");
-        await loadPersonalDashboard(db, user);
-      } catch (error) {
-        showToast(error.message || "Device unlink failed.");
-        action.disabled = false;
-      }
-    });
-  }
-
+  // Customer accounts do not receive enrollment or unlink controls.
   document.querySelectorAll("[data-generate-enrollment-code]").forEach((button) => {
     if (button.dataset.wired) return;
     button.dataset.wired = "1";
