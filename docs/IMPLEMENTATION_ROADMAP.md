@@ -186,3 +186,21 @@ Work in small, reviewable commits. For each phase:
 6. Move to the next slice only after the acceptance criteria pass.
 
 Do not mark a feature complete because its screen exists; mark it complete only when the backend, Android behavior, authorization and tests work together.
+
+
+### Phase 3 — Cryptographic device identity
+**Status: Initial server and Android Keystore implementation committed; CI and integration verification pending**
+
+- [x] Generate a P-256 ECDSA signing key in Android Keystore; the private key is not exported.
+- [x] Store the corresponding public key and SHA-256 fingerprint on the company device record during staff provisioning.
+- [x] Add staff-only device-key registration/rotation with audit logging.
+- [x] Add short-lived, one-time server challenges with per-device request throttling.
+- [x] Verify signed device check-ins against the enrolled public key and consume each challenge atomically to prevent replay.
+- [x] Remove the background check-in worker's dependency on a customer's Firebase login; keep local enrollment state and boot scheduling independent of customer sign-in.
+- [ ] Confirm Android release/debug builds and cryptographic integration tests pass.
+- [ ] Move safe device command fetch/acknowledgement to the same signed-device protocol; it currently remains on the legacy user-token path and is not invoked by the new worker.
+- [ ] Add staff-assisted key rotation/recovery verification for reinstall, app-data reset and lost-key scenarios.
+- [ ] Add server-side cleanup/TTL policy for expired challenge documents.
+- [ ] Verify production Vercel deployment and test challenge/signature/replay behavior on an owned test handset.
+
+**Security note:** Android Keystore protects the private key from normal app-level export, but hardware-backed storage is device-dependent. Uninstalling or clearing app data can make the existing key unavailable; a staff-authorized key rotation is required. A stable installation ID alone is never accepted as device authentication.
