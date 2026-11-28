@@ -15,7 +15,7 @@ object DeviceCommandProcessor {
     fun process(context: Context, installId: String, token: String): Boolean {
         val prefs = context.getSharedPreferences("z3x_device_identity", Context.MODE_PRIVATE)
         val response = post(
-            "https://z3x-finance-agent-rlq5.vercel.app/api/fetch-device-commands",
+            "https://z3x-finance-agent-rlq5.vercel.app/api/device-commands?action=fetch",
             token,
             JSONObject().put("installId", installId)
         ) ?: return false
@@ -54,7 +54,7 @@ object DeviceCommandProcessor {
                 }
             }
             val acknowledged = post(
-                "https://z3x-finance-agent-rlq5.vercel.app/api/complete-device-command",
+                "https://z3x-finance-agent-rlq5.vercel.app/api/device-commands?action=complete",
                 token,
                 JSONObject()
                     .put("installId", installId)
